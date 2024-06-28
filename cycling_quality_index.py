@@ -29,6 +29,8 @@ importlib.reload(p)
 import definitions as d
 importlib.reload(d)
 
+qgis_layers = {}
+
 def check_sidepath(sidepath_dict, id, key, checks):
     for item in sidepath_dict[id][key].keys():
         if checks <= 2:
@@ -74,6 +76,95 @@ def ensure_attributes(layer, attributes_list, new_attributes_dict):
                 }[field_type]
                 layer.dataProvider().addAttributes([QgsField(attr, qvariant_type)])
         layer.updateFields()
+
+def determine_maxspeed(feature, hw):
+    maxspeed = feature.attribute('maxspeed')
+    if maxspeed == 'walk' or (not maxspeed and hw == 'living_street'):
+        return 10
+    if maxspeed == 'none':
+        return 299
+    if not maxspeed and hw == 'living_street':
+        return 10
+    return d.getNumber(maxspeed)
+
+def check_sidepath(sidepath_dict, id, key, checks):
+    key_dict = sidepath_dict[id].get(key, {})
+    if sum(key_dict.values()) >= (2/3) * checks:
+        return 'yes'
+    return 'no'
+
+
+def update_feature_sidepath_status(feature, sidepath_dict, field_ids, highway_class_list):
+    id = feature.attribute('id')
+    is_sidepath = feature.attribute('is_sidepath')
+    checks = sidepath_dict[id].get('checks')
+    if feature.attribute('footway') == 'sidewalk':
+        is_sidepath = 'yes'
+    if not is_sidepath:
+        is_sidepath = 'no'
+        for key in ['id', 'highway', 'name']:
+            is_sidepath = check_sidepath(sidepath_dict, id, key, checks)
+            if is_sidepath == 'yes':
+                break
+
+    feature.setAttribute(field_ids.get("proc_sidepath"), is_sidepath)
+
+    return is_sidepath
+
+
+def update_feature_highway_class(feature, sidepath_dict, field_ids, highway_class_list):
+    id = feature.attribute('id')
+    is_sidepath_of = feature.attribute('is_sidepath:of')
+
+    if not is_sidepath_of and len(sidepath_dict[id]['highway']):
+        max_value = max(sidepath_dict[id]['highway'].values())
+        max_keys = [key for key, value in sidepath_dict[id]['highway'].items() if value == max_value]
+        min_index = len(highway_class_list) - 1
+        for key in max_keys:
+            if key in highway_class_list and highway_class_list.index(key) < min_index:
+                min_index = highway_class_list.index(key)
+        is_sidepath_of = highway_class_list[min_index]
+
+    feature.setAttribute(field_ids.get("proc_highway"), is_sidepath_of)
+    return is_sidepath_of
+
+
+def transfer_maxspeed(feature, sidepath_dict, field_ids):
+    is_sidepath_of = feature.attribute('proc_highway')
+    id = feature.attribute('id')
+    if is_sidepath_of in sidepath_dict[id]['maxspeed']:
+        maxspeed = sidepath_dict[id]['maxspeed'][is_sidepath_of]
+        if maxspeed:
+            feature.setAttribute(field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
+
+
+def transfer_sidepath_names(feature, sidepath_dict, field_ids):
+    id = feature.attribute('id')
+    if len(sidepath_dict[id]['name']):
+        name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k])  # Most frequent name
+        if name:
+            feature.setAttribute(field_ids.get("name"), name)
+
+
+def update_sidepath_attributes(layer, sidepath_dict, field_ids, highway_class_list):
+    with edit(layer):
+        for feature in layer.getFeatures():
+            hw = feature.attribute('highway')
+            maxspeed = determine_maxspeed(feature, hw)
+            if hw not in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
+                feature.setAttribute(field_ids.get("proc_highway"), hw)
+                feature.setAttribute(field_ids.get("proc_maxspeed"), maxspeed)
+                continue
+            
+            id = feature.attribute('id')
+            if id not in sidepath_dict:
+                continue
+
+            is_sidepath = update_feature_sidepath_status(feature, sidepath_dict, field_ids, highway_class_list)
+            if is_sidepath == 'yes':
+                is_sidepath_of = update_feature_highway_class(feature, sidepath_dict, field_ids, highway_class_list)
+                transfer_maxspeed(feature, sidepath_dict, field_ids)
+                transfer_sidepath_names(feature, sidepath_dict, field_ids)
 
 
 print_timestamped_message('Start processing:')
@@ -137,7 +228,6 @@ new_attributes_dict = {
         'filter_way_type': 'String'
     }
 
-qgis_layers = {}
 
 
 #--------------------------------
@@ -160,10 +250,8 @@ def main():
         p.attributes_list.append(attr)
 
     ensure_attributes(layer, p.attributes_list, new_attributes_dict)
-
     # Index fields for faster access
     field_ids = {field.name(): layer.fields().indexOf(field.name()) for field in layer.fields()}
-    
     # Add the layer to the project
     QgsProject.instance().addMapLayer(layer, False)
 
@@ -256,97 +344,81 @@ def main():
             road_highway = road.attribute('highway')
             road_name = road.attribute('name')
             road_maxspeed = d.getNumber(road.attribute('maxspeed'))
-            # print(road_maxspeed)
-            if not road_id in ids_list:
-                ids_list.append(road_id)
-            if not road_highway in highway_list:
-                highway_list.append(road_highway)
-            if not road_highway in maxspeed_dict or maxspeed_dict[road_highway] < road_maxspeed:
-                maxspeed_dict[road_highway] = road_maxspeed
-            if not road_name in name_list:
-                name_list.append(road_name)
-        for road_id in ids_list:
-            if road_id in sidepath_dict[buffer_id]['id']:
-                sidepath_dict[buffer_id]['id'][road_id] += 1
-            else:
-                sidepath_dict[buffer_id]['id'][road_id] = 1
-        for road_highway in highway_list:
-            if road_highway in sidepath_dict[buffer_id]['highway']:
-                sidepath_dict[buffer_id]['highway'][road_highway] += 1
-            else:
-                sidepath_dict[buffer_id]['highway'][road_highway] = 1
-        for road_name in name_list:
-            if road_name in sidepath_dict[buffer_id]['name']:
-                sidepath_dict[buffer_id]['name'][road_name] += 1
-            else:
-                sidepath_dict[buffer_id]['name'][road_name] = 1
 
-        for highway in maxspeed_dict.keys():
-            if not highway in sidepath_dict[buffer_id]['maxspeed'] or sidepath_dict[buffer_id]['maxspeed'][highway] < maxspeed_dict[highway]:
+            if road_id not in ids_list:
+                ids_list.append(road_id)
+            if road_highway not in highway_list:
+                highway_list.append(road_highway)
+            if road_highway not in maxspeed_dict or maxspeed_dict[road_highway] < road_maxspeed:
+                maxspeed_dict[road_highway] = road_maxspeed
+            if road_name not in name_list:
+                name_list.append(road_name)
+        
+        for road_id in ids_list:
+            sidepath_dict[buffer_id]['id'][road_id] = sidepath_dict[buffer_id]['id'].get(road_id, 0) + 1
+        for road_highway in highway_list:
+            sidepath_dict[buffer_id]['highway'][road_highway] = sidepath_dict[buffer_id]['highway'].get(road_highway, 0) + 1
+        for road_name in name_list:
+            sidepath_dict[buffer_id]['name'][road_name] = sidepath_dict[buffer_id]['name'].get(road_name, 0) + 1
+        for highway in maxspeed_dict:
+            if highway not in sidepath_dict[buffer_id]['maxspeed'] or sidepath_dict[buffer_id]['maxspeed'][highway] < maxspeed_dict[highway]:
                 sidepath_dict[buffer_id]['maxspeed'][highway] = maxspeed_dict[highway]
 
     highway_class_list = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'unclassified', 'residential', 'road', 'living_street', 'service', 'pedestrian', NULL]
 
+    update_sidepath_attributes(layer, sidepath_dict, field_ids, highway_class_list)
     #a path is considered a sidepath if at least two thirds of its check points are found to be close to road segments with the same OSM ID, highway class or street name
-    with edit(layer):
-        for feature in layer.getFeatures():
-            hw = feature.attribute('highway')
-            maxspeed = feature.attribute('maxspeed')
-            if maxspeed == 'walk' or (not maxspeed and hw == 'living_street'):
-                maxspeed = 10
-            if maxspeed == 'none':
-                maxspeed = 299
-            if not maxspeed and hw == 'living_street':
-                maxspeed = 10
-            if not hw in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
-                layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), hw)
-                layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
-                continue
-            id = feature.attribute('id')
-            if not sidepath_dict.get(id, {}):
-                continue
-            is_sidepath = feature.attribute('is_sidepath')
-            if feature.attribute('footway') == 'sidewalk':
-                is_sidepath = 'yes'
-            is_sidepath_of = feature.attribute('is_sidepath:of')
-            checks = sidepath_dict.get(id, {}).get('checks', 1)
+    # with edit(layer):
+    #     for feature in layer.getFeatures():
+    #         hw = feature.attribute('highway')
+    #         maxspeed = determine_maxspeed(feature, hw)
 
-            if not is_sidepath:
-                is_sidepath = 'no'
+    #         if hw not in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
+    #             layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), hw)
+    #             layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
+    #             continue
 
-                if is_sidepath != 'yes':
-                    is_sidepath = check_sidepath(sidepath_dict, id, 'id', checks)
-                if is_sidepath != 'yes':
-                    is_sidepath = check_sidepath(sidepath_dict, id, 'highway', checks)
-                if is_sidepath != 'yes':
-                    is_sidepath = check_sidepath(sidepath_dict, id, 'name', checks)
+    #         id = feature.attribute('id')
+    #         if id not in sidepath_dict:
+    #             continue
+            
+    #         is_sidepath = feature.attribute('is_sidepath')
+    #         if feature.attribute('footway') == 'sidewalk':
+    #             is_sidepath = 'yes'
+            
+    #         is_sidepath_of = update_feature_sidepath_status(feature, sidepath_dict, field_ids, highway_class_list)
+    #         transfer_sidepath_names(feature, sidepath_dict, field_ids)
+    #         feature.setAttribute(field_ids.get("proc_highway"), is_sidepath_of)
 
-            layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), is_sidepath)
+    #         is_sidepath_of = feature.attribute('is_sidepath:of')
+    #         checks = sidepath_dict[id].get('checks')
 
-            #derive the highway class of the associated road
-            if not is_sidepath_of and is_sidepath == 'yes':
-                if len(sidepath_dict[id]['highway']):
-                    max_value = max(sidepath_dict[id]['highway'].values())
-                    max_keys = [key for key, value in sidepath_dict[id]['highway'].items() if value == max_value]
-                    min_index = len(highway_class_list) - 1
-                    for key in max_keys:
-                        if not key in highway_class_list:
-                            continue
-                        if highway_class_list.index(key) < min_index:
-                            min_index = highway_class_list.index(key)
-                    is_sidepath_of = highway_class_list[min_index]
 
-            layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), is_sidepath_of)
 
-            if is_sidepath == 'yes' and is_sidepath_of and is_sidepath_of in sidepath_dict[id]['maxspeed']:
-                maxspeed = sidepath_dict[id]['maxspeed'][is_sidepath_of]
-                if maxspeed:
-                    layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
-            #transfer names to sidepath
-            if is_sidepath == 'yes' and len(sidepath_dict[id]['name']):
-                name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k]) #the most frequent name in the surrounding
-                if name:
-                    layer.changeAttributeValue(feature.id(), layer.fields().indexOf('name'), name)
+    #         #derive the highway class of the associated road
+    #         if not is_sidepath_of and is_sidepath == 'yes':
+    #             if len(sidepath_dict[id]['highway']):
+    #                 max_value = max(sidepath_dict[id]['highway'].values())
+    #                 max_keys = [key for key, value in sidepath_dict[id]['highway'].items() if value == max_value]
+    #                 min_index = len(highway_class_list) - 1
+    #                 for key in max_keys:
+    #                     if not key in highway_class_list:
+    #                         continue
+    #                     if highway_class_list.index(key) < min_index:
+    #                         min_index = highway_class_list.index(key)
+    #                 is_sidepath_of = highway_class_list[min_index]
+
+    #         layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), is_sidepath_of)
+
+    #         if is_sidepath == 'yes' and is_sidepath_of and is_sidepath_of in sidepath_dict[id]['maxspeed']:
+    #             maxspeed = sidepath_dict[id]['maxspeed'][is_sidepath_of]
+    #             if maxspeed:
+    #                 layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
+    #         #transfer names to sidepath
+    #         if is_sidepath == 'yes' and len(sidepath_dict[id]['name']):
+    #             name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k]) #the most frequent name in the surrounding
+    #             if name:
+    #                 layer.changeAttributeValue(feature.id(), field_ids.get('name'), name)
 
 
 
