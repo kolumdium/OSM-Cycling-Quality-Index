@@ -29,9 +29,55 @@ importlib.reload(p)
 import definitions as d
 importlib.reload(d)
 
-print(time.strftime('%H:%M:%S', time.localtime()), 'Start processing:')
+def check_sidepath(sidepath_dict, id, key, checks):
+    for item in sidepath_dict[id][key].keys():
+        if checks <= 2:
+            if sidepath_dict[id][key][item] == checks:
+                return 'yes'
+        else:
+            if sidepath_dict[id][key][item] >= checks * 0.66:
+                return 'yes'
+    return 'no'
 
-print(time.strftime('%H:%M:%S', time.localtime()), 'Read data...')
+
+def print_timestamped_message(message):
+    print(time.strftime('%H:%M:%S', time.localtime()), message)
+
+
+def reproject_layer(input_layer, target_crs):
+    print_timestamped_message('Reproject data...')
+    return processing.run('native:reprojectlayer', {
+        'INPUT': input_layer,
+        'TARGET_CRS': QgsCoordinateReferenceSystem(target_crs),
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+
+def retain_fields(layer, fields):
+    print_timestamped_message('Prepare data...')
+    return processing.run('native:retainfields', {
+        'INPUT': layer,
+        'FIELDS': fields,
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+
+def ensure_attributes(layer, attributes_list, new_attributes_dict):
+    with edit(layer):
+        for attr in attributes_list:
+            if layer.fields().indexOf(attr) == -1:
+                field_type = new_attributes_dict.get(attr, 'String')
+                qvariant_type = {
+                    'Double': QVariant.Double,
+                    'Int': QVariant.Int,
+                    'String': QVariant.String
+                }[field_type]
+                layer.dataProvider().addAttributes([QgsField(attr, qvariant_type)])
+        layer.updateFields()
+
+
+print_timestamped_message('Start processing:')
+print_timestamped_message('Read data...')
 
 #list of new attributes, important for calculating cycling quality index
 new_attributes_dict = {
@@ -93,16 +139,6 @@ new_attributes_dict = {
 
 qgis_layers = {}
 
-def check_sidepath(sidepath_dict, id, key, checks):
-    for item in sidepath_dict[id][key].keys():
-        if checks <= 2:
-            if sidepath_dict[id][key][item] == checks:
-                return 'yes'
-        else:
-            if sidepath_dict[id][key][item] >= checks * 0.66:
-                return 'yes'
-    return 'no'
-
 
 #--------------------------------
 #      S c r i p t   S t a r t
@@ -117,135 +153,101 @@ def main():
 
     layer_way_input = QgsVectorLayer(dir_input + file_format + '|geometrytype=LineString', 'way input', 'ogr')
 
-    print(time.strftime('%H:%M:%S', time.localtime()), 'Reproject data...')
-    layer = processing.run('native:reprojectlayer', { 'INPUT' : layer_way_input, 'TARGET_CRS' : QgsCoordinateReferenceSystem(p.crs_metric), 'OUTPUT': 'memory:'})['OUTPUT']
+    layer = reproject_layer(layer_way_input, p.crs_metric)
+    layer = retain_fields(layer, p.attributes_list)
 
-    #prepare attributes
-    print(time.strftime('%H:%M:%S', time.localtime()), 'Prepare data...')
-    #delete unneeded attributes
-    layer = processing.run('native:retainfields', { 'INPUT' : layer, 'FIELDS' : p.attributes_list, 'OUTPUT': 'memory:'})['OUTPUT']
-
-    for attr in list(new_attributes_dict.keys()):
+    for attr in new_attributes_dict.keys():
         p.attributes_list.append(attr)
 
-    #make sure all attributes are existing in the table to prevent errors when asking for a missing one
-    with edit(layer):
-        for attr in p.attributes_list:
-            if layer.fields().indexOf(attr) == -1:
-                if attr in new_attributes_dict:
-                    if new_attributes_dict[attr] == 'Double':
-                        layer.dataProvider().addAttributes([QgsField(attr, QVariant.Double)])
-                    elif new_attributes_dict[attr] == 'Int':
-                        layer.dataProvider().addAttributes([QgsField(attr, QVariant.Int)])
-                    else:
-                        layer.dataProvider().addAttributes([QgsField(attr, QVariant.String)])
-                else:
-                    layer.dataProvider().addAttributes([QgsField(attr, QVariant.String)])
-        layer.updateFields()
+    ensure_attributes(layer, p.attributes_list, new_attributes_dict)
 
-    id_way_type = layer.fields().indexOf('way_type')
-    id_index = layer.fields().indexOf('index')
-    id_index_10 = layer.fields().indexOf('index_10')
-    id_stress_level = layer.fields().indexOf('stress_level')
-    id_offset = layer.fields().indexOf('offset')
-    id_offset_cycleway_left = layer.fields().indexOf('offset_cycleway_left')
-    id_offset_cycleway_right = layer.fields().indexOf('offset_cycleway_right')
-    id_offset_sidewalk_left = layer.fields().indexOf('offset_sidewalk_left')
-    id_offset_sidewalk_right = layer.fields().indexOf('offset_sidewalk_right')
-    id_type = layer.fields().indexOf('type')
-    id_side = layer.fields().indexOf('side')
-    id_proc_width = layer.fields().indexOf('proc_width')
-    id_proc_surface = layer.fields().indexOf('proc_surface')
-    id_proc_smoothness = layer.fields().indexOf('proc_smoothness')
-    id_proc_oneway = layer.fields().indexOf('proc_oneway')
-    id_proc_sidepath = layer.fields().indexOf('proc_sidepath')
-    id_proc_highway = layer.fields().indexOf('proc_highway')
-    id_proc_maxspeed = layer.fields().indexOf('proc_maxspeed')
-    id_proc_traffic_mode_left = layer.fields().indexOf('proc_traffic_mode_left')
-    id_proc_traffic_mode_right = layer.fields().indexOf('proc_traffic_mode_right')
-    id_proc_separation_left = layer.fields().indexOf('proc_separation_left')
-    id_proc_separation_right = layer.fields().indexOf('proc_separation_right')
-    id_proc_buffer_left = layer.fields().indexOf('proc_buffer_left')
-    id_proc_buffer_right = layer.fields().indexOf('proc_buffer_right')
-    id_proc_mandatory = layer.fields().indexOf('proc_mandatory')
-    id_proc_traffic_sign = layer.fields().indexOf('proc_traffic_sign')
-    id_fac_width = layer.fields().indexOf('fac_width')
-    id_fac_surface = layer.fields().indexOf('fac_surface')
-    id_fac_highway = layer.fields().indexOf('fac_highway')
-    id_fac_maxspeed = layer.fields().indexOf('fac_maxspeed')
-    id_fac_protection_level = layer.fields().indexOf('fac_protection_level')
-    id_prot_level_separation_left = layer.fields().indexOf('prot_level_separation_left')
-    id_prot_level_separation_right = layer.fields().indexOf('prot_level_separation_right')
-    id_prot_level_buffer_left = layer.fields().indexOf('prot_level_buffer_left')
-    id_prot_level_buffer_right = layer.fields().indexOf('prot_level_buffer_right')
-    id_prot_level_left = layer.fields().indexOf('prot_level_left')
-    id_prot_level_right = layer.fields().indexOf('prot_level_right')
-    id_base_index = layer.fields().indexOf('base_index')
-    id_fac_1 = layer.fields().indexOf('fac_1')
-    id_fac_2 = layer.fields().indexOf('fac_2')
-    id_fac_3 = layer.fields().indexOf('fac_3')
-    id_fac_4 = layer.fields().indexOf('fac_4')
-    id_data_bonus = layer.fields().indexOf('data_bonus')
-    id_data_malus = layer.fields().indexOf('data_malus')
-    id_data_incompleteness = layer.fields().indexOf('data_incompleteness')
-    id_data_missing = layer.fields().indexOf('data_missing')
-    id_data_missing_width = layer.fields().indexOf('data_missing_width')
-    id_data_missing_surface = layer.fields().indexOf('data_missing_surface')
-    id_data_missing_smoothness = layer.fields().indexOf('data_missing_smoothness')
-    id_data_missing_maxspeed = layer.fields().indexOf('data_missing_maxspeed')
-    id_data_missing_parking = layer.fields().indexOf('data_missing_parking')
-    id_data_missing_lit = layer.fields().indexOf('data_missing_lit')
-    id_filter_usable = layer.fields().indexOf('filter_usable')
-    id_filter_way_type = layer.fields().indexOf('filter_way_type')
-
+    # Index fields for faster access
+    field_ids = {field.name(): layer.fields().indexOf(field.name()) for field in layer.fields()}
+    
+    # Add the layer to the project
     QgsProject.instance().addMapLayer(layer, False)
-
 
 
     #---------------------------------------------------------------#
     #1: Check paths whether they are sidepath (a path along a road) #
     #---------------------------------------------------------------#
 
-    print(time.strftime('%H:%M:%S', time.localtime()), 'Sidepath check...')
-    print(time.strftime('%H:%M:%S', time.localtime()), '   Create way layers...')
-    #create path layer: check all path, footways or cycleways for their sidepath status
-    layer_path = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS \'cycleway\' OR "highway" IS \'footway\' OR "highway" IS \'path\' OR "highway" IS \'bridleway\' OR "highway" IS \'steps\'', 'OUTPUT': 'memory:'})['OUTPUT']
-    #create road layer: extract all other highway types (except tracks)
-    layer_roads = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS NOT \'cycleway\' AND "highway" IS NOT \'footway\' AND "highway" IS NOT \'path\' AND "highway" IS NOT \'bridleway\' AND "highway" IS NOT \'steps\' AND "highway" IS NOT \'track\'', 'OUTPUT': 'memory:'})['OUTPUT']
+    print_timestamped_message('Sidepath check...')
+    print_timestamped_message('   Create way layers...')
+    
+    # Create path and road layers
+    layer_path = processing.run('qgis:extractbyexpression', {
+        'INPUT': layer,
+        'EXPRESSION': '"highway" IN (\'cycleway\', \'footway\', \'path\', \'bridleway\', \'steps\')',
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
 
-    print(time.strftime('%H:%M:%S', time.localtime()), '   Create check points...')
-    #create "check points" along each segment (to check for near/parallel highways at every checkpoint)
-    layer_path_points = processing.run('native:pointsalonglines', {'INPUT' : layer_path, 'DISTANCE' : p.sidepath_buffer_distance, 'OUTPUT': 'memory:'})['OUTPUT']
-    layer_path_points_endpoints = processing.run('native:extractspecificvertices', { 'INPUT' : layer_path, 'VERTICES' : '-1', 'OUTPUT': 'memory:'})['OUTPUT']
-    layer_path_points = processing.run('native:mergevectorlayers', { 'LAYERS' : [layer_path_points, layer_path_points_endpoints], 'OUTPUT': 'memory:'})['OUTPUT']
-    #create "check buffers" (to check for near/parallel highways with in the given distance)
-    layer_path_points_buffers = processing.run('native:buffer', { 'INPUT' : layer_path_points, 'DISTANCE' : p.sidepath_buffer_size, 'OUTPUT': 'memory:'})['OUTPUT']
+    layer_roads = processing.run('qgis:extractbyexpression', {
+        'INPUT': layer,
+        'EXPRESSION': '"highway" NOT IN (\'cycleway\', \'footway\', \'path\', \'bridleway\', \'steps\', \'track\')',
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+    print_timestamped_message('   Create check points...')
+
+    layer_path_points = processing.run('native:pointsalonglines', {
+        'INPUT': layer_path,
+        'DISTANCE': p.sidepath_buffer_distance,
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+    layer_path_points_endpoints = processing.run('native:extractspecificvertices', {
+        'INPUT': layer_path,
+        'VERTICES': '-1',
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+    layer_path_points = processing.run('native:mergevectorlayers', {
+        'LAYERS': [layer_path_points, layer_path_points_endpoints],
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
+    layer_path_points_buffers = processing.run('native:buffer', {
+        'INPUT': layer_path_points,
+        'DISTANCE': p.sidepath_buffer_size,
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+
     QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
+    
+    print_timestamped_message('   Check for adjacent roads...')
 
-    print(time.strftime('%H:%M:%S', time.localtime()), '   Check for adjacent roads...')
-
-    #for all check points: Save nearby road id's, names and highway classes in a dict
+    # Check for adjacent roads and save information in a dictionary
     sidepath_dict = {}
     for buffer in layer_path_points_buffers.getFeatures():
         buffer_id = buffer.attribute('id')
         buffer_layer = buffer.attribute('layer')
         if not buffer_id in sidepath_dict:
-            sidepath_dict[buffer_id] = {}
-            sidepath_dict[buffer_id]['checks'] = 1
-            sidepath_dict[buffer_id]['id'] = {}
-            sidepath_dict[buffer_id]['highway'] = {}
-            sidepath_dict[buffer_id]['name'] = {}
-            sidepath_dict[buffer_id]['maxspeed'] = {}
+            sidepath_dict[buffer_id] = {
+                'checks': 1,
+                'id': {},
+                'highway': {},
+                'name': {},
+                'maxspeed': {}
+            }
         else:
-            sidepath_dict[buffer_id]['checks'] += 1
+            sidepath_dict[buffer_id]['checks'] += 1 # FIXME: what is this for?
+
         layer_path_points_buffers.removeSelection()
         layer_path_points_buffers.select(buffer.id())
-        processing.run('native:selectbylocation', {'INPUT' : layer_roads, 'INTERSECT' : QgsProcessingFeatureSourceDefinition(layer_path_points_buffers.id(), selectedFeaturesOnly=True), 'METHOD' : 0, 'PREDICATE' : [0,6]})
 
-        id_list = []
+        processing.run('native:selectbylocation', {
+            'INPUT': layer_roads,
+            'INTERSECT': QgsProcessingFeatureSourceDefinition(layer_path_points_buffers.id(), selectedFeaturesOnly=True),
+            'METHOD': 0,
+            'PREDICATE': [0, 6]
+        })
+
+        ids_list = []
         highway_list = []
         name_list = []
         maxspeed_dict = {}
+        
         for road in layer_roads.selectedFeatures():
             road_layer = road.attribute('layer')
             if buffer_layer != road_layer:
@@ -255,15 +257,15 @@ def main():
             road_name = road.attribute('name')
             road_maxspeed = d.getNumber(road.attribute('maxspeed'))
             # print(road_maxspeed)
-            if not road_id in id_list:
-                id_list.append(road_id)
+            if not road_id in ids_list:
+                ids_list.append(road_id)
             if not road_highway in highway_list:
                 highway_list.append(road_highway)
             if not road_highway in maxspeed_dict or maxspeed_dict[road_highway] < road_maxspeed:
                 maxspeed_dict[road_highway] = road_maxspeed
             if not road_name in name_list:
                 name_list.append(road_name)
-        for road_id in id_list:
+        for road_id in ids_list:
             if road_id in sidepath_dict[buffer_id]['id']:
                 sidepath_dict[buffer_id]['id'][road_id] += 1
             else:
@@ -297,8 +299,8 @@ def main():
             if not maxspeed and hw == 'living_street':
                 maxspeed = 10
             if not hw in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
-                layer.changeAttributeValue(feature.id(), id_proc_highway, hw)
-                layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(maxspeed))
+                layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), hw)
+                layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
                 continue
             id = feature.attribute('id')
             if not sidepath_dict.get(id, {}):
@@ -319,7 +321,7 @@ def main():
                 if is_sidepath != 'yes':
                     is_sidepath = check_sidepath(sidepath_dict, id, 'name', checks)
 
-            layer.changeAttributeValue(feature.id(), id_proc_sidepath, is_sidepath)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), is_sidepath)
 
             #derive the highway class of the associated road
             if not is_sidepath_of and is_sidepath == 'yes':
@@ -334,12 +336,12 @@ def main():
                             min_index = highway_class_list.index(key)
                     is_sidepath_of = highway_class_list[min_index]
 
-            layer.changeAttributeValue(feature.id(), id_proc_highway, is_sidepath_of)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), is_sidepath_of)
 
             if is_sidepath == 'yes' and is_sidepath_of and is_sidepath_of in sidepath_dict[id]['maxspeed']:
                 maxspeed = sidepath_dict[id]['maxspeed'][is_sidepath_of]
                 if maxspeed:
-                    layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(maxspeed))
+                    layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
             #transfer names to sidepath
             if is_sidepath == 'yes' and len(sidepath_dict[id]['name']):
                 name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k]) #the most frequent name in the surrounding
@@ -390,7 +392,7 @@ def main():
                     #option 2: static offset as defined in the variable
                     else:
                         offset_cycleway_left = d.getNumber(p.offset_distance)
-                    layer.changeAttributeValue(feature.id(), id_offset_cycleway_left, offset_cycleway_left)
+                    layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_left'), offset_cycleway_left)
 
                 #offset for right cycleways
                 if cycleway in ['lane', 'track', 'share_busway'] or cycleway_both in ['lane', 'track', 'share_busway'] or cycleway_right in ['lane', 'track', 'share_busway']:
@@ -398,7 +400,7 @@ def main():
                         offset_cycleway_right = width / 2
                     else:
                         offset_cycleway_right = d.getNumber(p.offset_distance)
-                    layer.changeAttributeValue(feature.id(), id_offset_cycleway_right, offset_cycleway_right)
+                    layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_right'), offset_cycleway_right)
 
             #offset for shared footways
             #offset for left sidewalks
@@ -409,7 +411,7 @@ def main():
                 else:
                     #TODO: double offset if cycleway exists on same side
                     offset_sidewalk_left = d.getNumber(p.offset_distance)
-                layer.changeAttributeValue(feature.id(), id_offset_sidewalk_left, offset_sidewalk_left)
+                layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_left'), offset_sidewalk_left)
 
             #offset for right sidewalks
             if sidewalk_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_both_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_right_bicycle in ['yes', 'designated', 'permissive']:
@@ -417,7 +419,7 @@ def main():
                     offset_sidewalk_right = width / 2 + 2
                 else:
                     offset_sidewalk_right = d.getNumber(p.offset_distance)
-                layer.changeAttributeValue(feature.id(), id_offset_sidewalk_right, offset_sidewalk_right)
+                layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_right'), offset_sidewalk_right)
 
         processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_cycleway_left\" IS NOT NULL'})
         offset_cycleway_left_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('"offset_cycleway_left"'), 'OUTPUT': 'memory:'})['OUTPUT']
@@ -447,13 +449,13 @@ def main():
                 continue
             with edit(offset_layer):
                 for feature in offset_layer.getFeatures():
-                    offset_layer.changeAttributeValue(feature.id(), id_offset, feature.attribute('offset_' + type + '_' + side))
-                    offset_layer.changeAttributeValue(feature.id(), id_type, type)
-                    offset_layer.changeAttributeValue(feature.id(), id_side, side)
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('offset'), feature.attribute('offset_' + type + '_' + side))
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('type'), type)
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('side'), side)
                     #this offset geometries are sidepath
-                    offset_layer.changeAttributeValue(feature.id(), id_proc_sidepath, 'yes')
-                    offset_layer.changeAttributeValue(feature.id(), id_proc_highway, feature.attribute('highway'))
-                    offset_layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(feature.attribute('maxspeed')))
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), 'yes')
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), feature.attribute('highway'))
+                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(feature.attribute('maxspeed')))
 
                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('width'), d.deriveAttribute(feature, 'width', type, side, 'float'))
                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway'), d.deriveAttribute(feature, 'oneway', type, side, 'str'))
@@ -669,7 +671,7 @@ def main():
             if way_type == '':
                 way_type = NULL
             else:
-                layer.changeAttributeValue(feature.id(), id_way_type, way_type)
+                layer.changeAttributeValue(feature.id(), field_ids.get('way_type'), way_type)
 
         layer.updateFields()
 
@@ -728,7 +730,7 @@ def main():
                         proc_oneway = 'yes'
             if not proc_oneway:
                 proc_oneway = 'unknown'
-            layer.changeAttributeValue(feature.id(), id_proc_oneway, proc_oneway)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_oneway"), proc_oneway)
 
             #-------------
             #Derive width. Use explicitely tagged attributes, derive from other attributes or use default values.
@@ -750,7 +752,7 @@ def main():
                         if proc_width and proc_oneway == 'no':
                             proc_width *= 1.6 #default values are for oneways - if the way isn't a oneway, widen the default
                         data_missing = d.addDelimitedValue(data_missing, 'width')
-                        layer.changeAttributeValue(feature.id(), id_data_missing_width, 1)
+                        layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_width'), 1)
             if way_type == 'segregated path':
                 highway = feature.attribute('highway')
                 if highway == 'path':
@@ -764,7 +766,7 @@ def main():
                             else:
                                 proc_width = width / 2
                         data_missing = d.addDelimitedValue(data_missing, 'width')
-                        layer.changeAttributeValue(feature.id(), id_data_missing_width, 1)
+                        layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_width'), 1)
 
                 else:
                     proc_width = d.getNumber(feature.attribute('width'))
@@ -773,7 +775,7 @@ def main():
                     if proc_oneway == 'no':
                         proc_width *= 1.6
                     data_missing = d.addDelimitedValue(data_missing, 'width')
-                    layer.changeAttributeValue(feature.id(), id_data_missing_width, 1)
+                    layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_width'), 1)
             if way_type in ['shared road', 'shared traffic lane', 'shared bus lane', 'bicycle road', 'track or service']:
                 #on shared traffic or bus lanes, use a width value based on lane width, not on carriageway width
                 if way_type in ['shared traffic lane', 'shared bus lane']:
@@ -970,7 +972,7 @@ def main():
                             if 'yes' in proc_oneway:
                                 width = round(width / 1.6, 1)
                             data_missing = d.addDelimitedValue(data_missing, 'width')
-                            layer.changeAttributeValue(feature.id(), id_data_missing_width, 1)
+                            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_width'), 1)
 
                         buffer = d.getNumber(cycleway_right_buffer_left) + d.getNumber(cycleway_right_buffer_right) + d.getNumber(cycleway_left_buffer_left) + d.getNumber(cycleway_left_buffer_right)
                         proc_width = width - d.getNumber(cycleway_right_width) - d.getNumber(cycleway_left_width) - buffer
@@ -989,7 +991,7 @@ def main():
                                 #mark "parking" as a missing value if there are no parking tags on regular roads
                                 #TODO: Differentiate between inner and outer urban areas/city limits - out of cities, there is usually no need to map street parking
                                 data_missing = d.addDelimitedValue(data_missing, 'parking')
-                                layer.changeAttributeValue(feature.id(), id_data_missing_parking, 1)
+                                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_parking'), 1)
 
                         #if width was derived from a default, the result should not be less than the default width of a motorcar lane
                         if proc_width < p.default_width_traffic_lane and 'width' in data_missing:
@@ -998,7 +1000,7 @@ def main():
             if not proc_width:
                 proc_width = NULL
 
-            layer.changeAttributeValue(feature.id(), id_proc_width, proc_width)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_width"), proc_width)
 
             #-------------
             #Derive surface and smoothness.
@@ -1032,7 +1034,7 @@ def main():
                             else:
                                 proc_surface = p.default_highway_surface_dict['path']
                             data_missing = d.addDelimitedValue(data_missing, 'surface')
-                            layer.changeAttributeValue(feature.id(), id_data_missing_surface, 1)
+                            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_surface'), 1)
                     if not proc_smoothness:
                         proc_smoothness = feature.attribute('cycleway:smoothness')
                         if not proc_smoothness:
@@ -1041,7 +1043,7 @@ def main():
                                 proc_smoothness = smoothness
                             else:
                                 data_missing = d.addDelimitedValue(data_missing, 'smoothness')
-                                layer.changeAttributeValue(feature.id(), id_data_missing_smoothness, 1)
+                                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_smoothness'), 1)
 
                 else:
                     #surface and smoothness for cycle lanes and sidewalks have already been derived from original tags when calculating way offsets
@@ -1064,12 +1066,12 @@ def main():
                             else:
                                 proc_surface = p.default_highway_surface_dict['path']
                         data_missing = d.addDelimitedValue(data_missing, 'surface')
-                        layer.changeAttributeValue(feature.id(), id_data_missing_surface, 1)
+                        layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_surface'), 1)
                     if not proc_smoothness:
                         proc_smoothness = feature.attribute('smoothness')
                         if not proc_smoothness:
                             data_missing = d.addDelimitedValue(data_missing, 'smoothness')
-                            layer.changeAttributeValue(feature.id(), id_data_missing_smoothness, 1)
+                            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_smoothness'), 1)
 
             #if more than one surface value is tagged (delimited by a semicolon), use the weakest one
             if ';' in proc_surface:
@@ -1079,8 +1081,8 @@ def main():
             if proc_smoothness not in p.smoothness_factor_dict:
                 proc_smoothness = NULL
             
-            layer.changeAttributeValue(feature.id(), id_proc_surface, proc_surface)
-            layer.changeAttributeValue(feature.id(), id_proc_smoothness, proc_smoothness)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_surface"), proc_surface)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_smoothness"), proc_smoothness)
 
             #-------------
             #Derive (physical) separation and buffer.
@@ -1194,12 +1196,12 @@ def main():
                             if traffic_mode_left == 'motor_vehicle' and not buffer_left:
                                 buffer_left = buffer
 
-            layer.changeAttributeValue(feature.id(), id_proc_traffic_mode_left, traffic_mode_left)
-            layer.changeAttributeValue(feature.id(), id_proc_traffic_mode_right, traffic_mode_right)
-            layer.changeAttributeValue(feature.id(), id_proc_separation_left, separation_left)
-            layer.changeAttributeValue(feature.id(), id_proc_separation_right, separation_right)
-            layer.changeAttributeValue(feature.id(), id_proc_buffer_left, buffer_left)
-            layer.changeAttributeValue(feature.id(), id_proc_buffer_right, buffer_right)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_traffic_mode_left"), traffic_mode_left)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_traffic_mode_right"), traffic_mode_right)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_separation_left"), separation_left)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_separation_right"), separation_right)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_buffer_left"), buffer_left)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_buffer_right"), buffer_right)
 
             #-------------
             #Derive mandatory use as an extra information (not used for index calculation).
@@ -1243,8 +1245,8 @@ def main():
             if highway in p.cycling_highway_prohibition_list or bicycle == 'no':
                 proc_mandatory = 'prohibited'
 
-            layer.changeAttributeValue(feature.id(), id_proc_mandatory, proc_mandatory)
-            layer.changeAttributeValue(feature.id(), id_proc_traffic_sign, proc_traffic_sign)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_mandatory"), proc_mandatory)
+            layer.changeAttributeValue(feature.id(), field_ids.get("proc_traffic_sign"), proc_traffic_sign)
 
             #-------------
             #add extra attributes to easy filter non-usable segments or by way type
@@ -1252,7 +1254,7 @@ def main():
             filter_usable = 1
             if proc_mandatory in ['prohibited', 'use_sidepath']:
                 filter_usable = 0
-            layer.changeAttributeValue(feature.id(), id_filter_usable, filter_usable)
+            layer.changeAttributeValue(feature.id(), field_ids.get('filter_usable'), filter_usable)
 
             filter_way_type = NULL
             if way_type in ['cycle path', 'cycle track', 'shared path', 'segregated path', 'shared footway', 'cycle lane (protected)']:
@@ -1263,7 +1265,7 @@ def main():
                 filter_way_type = 'bicycle road'
             elif way_type in ['shared road', 'shared traffic lane', 'shared bus lane', 'track or service']:
                 filter_way_type = 'shared traffic'
-            layer.changeAttributeValue(feature.id(), id_filter_way_type, filter_way_type)
+            layer.changeAttributeValue(feature.id(), field_ids.get('filter_way_type'), filter_way_type)
 
 
 
@@ -1287,7 +1289,7 @@ def main():
                 if motor_vehicle_access in p.motor_vehicle_access_index_dict:
                     base_index = p.motor_vehicle_access_index_dict[motor_vehicle_access]
                     data_bonus = d.addDelimitedValue(data_bonus, 'motor vehicle restricted')
-            layer.changeAttributeValue(feature.id(), id_base_index, base_index)
+            layer.changeAttributeValue(feature.id(), field_ids.get('base_index'), base_index)
 
             #--------------------------------------------
             #Calculate width factor according to way type
@@ -1335,7 +1337,7 @@ def main():
             else:
                 fac_width = NULL
 
-            layer.changeAttributeValue(feature.id(), id_fac_width, fac_width)
+            layer.changeAttributeValue(feature.id(), field_ids.get('fac_width'), fac_width)
 
             if fac_width > 1:
                 data_bonus = d.addDelimitedValue(data_bonus, 'wide width')
@@ -1350,7 +1352,7 @@ def main():
             elif proc_surface and proc_surface in p.surface_factor_dict:
                 fac_surface = p.surface_factor_dict[proc_surface]
 
-            layer.changeAttributeValue(feature.id(), id_fac_surface, fac_surface)
+            layer.changeAttributeValue(feature.id(), field_ids.get('fac_surface'), fac_surface)
 
             if fac_surface > 1:
                 data_bonus = d.addDelimitedValue(data_bonus, 'excellent surface')
@@ -1373,10 +1375,10 @@ def main():
             #mark maxspeed value as missing, if the way segment is a sidepath or independent road (except for service, track or pedestrian segments where maxspeed isn't necessary)
             elif way_type != 'track or service' and feature.attribute('proc_sidepath') != 'no' and proc_highway not in ['pedestrian', 'service', 'track']:
                 data_missing = d.addDelimitedValue(data_missing, 'maxspeed')
-                layer.changeAttributeValue(feature.id(), id_data_missing_maxspeed, 1)
+                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_maxspeed'), 1)
 
-            layer.changeAttributeValue(feature.id(), id_fac_highway, fac_highway)
-            layer.changeAttributeValue(feature.id(), id_fac_maxspeed, fac_maxspeed)
+            layer.changeAttributeValue(feature.id(), field_ids.get('fac_highway'), fac_highway)
+            layer.changeAttributeValue(feature.id(), field_ids.get('fac_maxspeed'), fac_maxspeed)
 
 #            #-------------------------------------------------
 #            #Calculate (physical) separation and buffer factor
@@ -1408,12 +1410,12 @@ def main():
 #                prot_level_left = prot_level_separation_left * 0.67 + prot_level_buffer_left * 0.33
 #                prot_level_right = prot_level_separation_right * 0.67 + prot_level_buffer_right * 0.33
 #
-#                layer.changeAttributeValue(feature.id(), id_prot_level_separation_left, round(prot_level_separation_left, 3))
-#                layer.changeAttributeValue(feature.id(), id_prot_level_separation_right, round(prot_level_separation_right, 3))
-#                layer.changeAttributeValue(feature.id(), id_prot_level_buffer_left, round(prot_level_buffer_left, 3))
-#                layer.changeAttributeValue(feature.id(), id_prot_level_buffer_right, round(prot_level_buffer_right, 3))
-#                layer.changeAttributeValue(feature.id(), id_prot_level_left, round(prot_level_left, 3))
-#                layer.changeAttributeValue(feature.id(), id_prot_level_right, round(prot_level_right, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_separation_left'), round(prot_level_separation_left, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_separation_right'), round(prot_level_separation_right, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_buffer_left'), round(prot_level_buffer_left, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_buffer_right'), round(prot_level_buffer_right, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_left'), round(prot_level_left, 3))
+#                layer.changeAttributeValue(feature.id(), field_ids.get('prot_level_right'), round(prot_level_right, 3))
 #
 #                #derive a factor from that protection level values (0.9: no protection, 1.4: high protection)
 #                #if there is motor vehicle traffic on one side and foot (or bicycle) traffic on the other, the factor is composed of 75% motor vehicle side and 25% of the other side.
@@ -1438,7 +1440,7 @@ def main():
 #            else:
 #                fac_protection_level = NULL
 #
-#            layer.changeAttributeValue(feature.id(), id_fac_protection_level, fac_protection_level)
+#            layer.changeAttributeValue(feature.id(), field_ids.get('fac_protection_level'), fac_protection_level)
 
 
 
@@ -1461,7 +1463,7 @@ def main():
                     fac_1 = fac_surface
                 else:
                     fac_1 = 1
-                layer.changeAttributeValue(feature.id(), id_fac_1, round(fac_1, 2))
+                layer.changeAttributeValue(feature.id(), field_ids.get('fac_1'), round(fac_1, 2))
 
                 #factor 2: highway and maxspeed
                 #highway factor is weighted according to how close the bicycle traffic is to the motor traffic
@@ -1475,7 +1477,7 @@ def main():
                 fac_2 = fac_2 + ((1 - fac_2) * (1 - weight)) #factor is weighted (see above) - low weights lead to a factor closer to 1
                 if not fac_2:
                    fac_2 = 1
-                layer.changeAttributeValue(feature.id(), id_fac_2, round(fac_2, 2))
+                layer.changeAttributeValue(feature.id(), field_ids.get('fac_2'), round(fac_2, 2))
 
                 if weight >= 0.5:
                     if fac_2 > 1:
@@ -1487,7 +1489,7 @@ def main():
 
                 #factor 3: separation and buffer
                 fac_3 = 1
-                layer.changeAttributeValue(feature.id(), id_fac_3, round(fac_3, 2))
+                layer.changeAttributeValue(feature.id(), field_ids.get('fac_3'), round(fac_3, 2))
 
                 #factor group 4: miscellaneous attributes can result in an other bonus or malus
                 fac_4 = 1
@@ -1527,7 +1529,7 @@ def main():
                 lit = feature.attribute('lit')
                 if not lit:
                     data_missing = d.addDelimitedValue(data_missing, 'lit')
-                    layer.changeAttributeValue(feature.id(), id_data_missing_lit, 1)
+                    layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_lit'), 1)
                 if lit == 'no':
                     fac_4 -= 0.1
                     data_malus = d.addDelimitedValue(data_malus, 'no street lighting')
@@ -1551,7 +1553,7 @@ def main():
                     fac_4 -= 0.2
                     data_malus = d.addDelimitedValue(data_malus, 'cycling not intended')
 
-                layer.changeAttributeValue(feature.id(), id_fac_4, round(fac_4, 2))
+                layer.changeAttributeValue(feature.id(), field_ids.get('fac_4'), round(fac_4, 2))
 
                 index = base_index * fac_1 * fac_2 * fac_3 * fac_4
 
@@ -1560,11 +1562,11 @@ def main():
 
                 index_10 = index // 10   #index from 0..10 (e.g. index = 56 -> index_10 = 5)
 
-            layer.changeAttributeValue(feature.id(), id_index, index)
-            layer.changeAttributeValue(feature.id(), id_index_10, index_10)
-            layer.changeAttributeValue(feature.id(), id_data_missing, data_missing)
-            layer.changeAttributeValue(feature.id(), id_data_bonus, data_bonus)
-            layer.changeAttributeValue(feature.id(), id_data_malus, data_malus)
+            layer.changeAttributeValue(feature.id(), field_ids.get('index'), index)
+            layer.changeAttributeValue(feature.id(), field_ids.get('index_10'), index_10)
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing'), data_missing)
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_bonus'), data_bonus)
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_malus'), data_malus)
 
 
 
@@ -1611,7 +1613,7 @@ def main():
                     lts = 1
                 else:
                     lts = 2
-            layer.changeAttributeValue(feature.id(), id_stress_level, lts)
+            layer.changeAttributeValue(feature.id(), field_ids.get('stress_level'), lts)
 
 
 
@@ -1623,7 +1625,7 @@ def main():
             for value in missing_values:
                 if value in p.data_incompleteness_dict:
                     data_incompleteness += p.data_incompleteness_dict[value]
-            layer.changeAttributeValue(feature.id(), id_data_incompleteness, data_incompleteness)
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_incompleteness'), data_incompleteness)
 
         layer.updateFields()
 
