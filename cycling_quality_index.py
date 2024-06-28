@@ -14,8 +14,9 @@ from os.path import exists
 #project directory
 from console.console import _console
 project_dir = os.path.dirname(_console.console.tabEditorWidget.currentWidget().path) + '/'
-dir_input = project_dir + 'data/way_import'
-dir_output = project_dir + 'data/cycling_quality_index'
+place_name = "Schkeuditz, Germany"
+dir_input = project_dir + 'data/' + place_name
+dir_output = project_dir + 'data/cycling_quality_index' + '-' + place_name
 file_format = '.geojson'
 multi_input = False #if "True", it's possible to merge different import files stored in the input directory, marked with an ascending number starting with 1 at the end of the filename (e.g. way_import1.geojson, way_import2.geojson etc.) - can be used to process different areas at the same time or to process a larger area that can't be downloaded in one file
 
@@ -28,41 +29,92 @@ importlib.reload(p)
 import definitions as d
 importlib.reload(d)
 
+print(time.strftime('%H:%M:%S', time.localtime()), 'Start processing:')
+
+print(time.strftime('%H:%M:%S', time.localtime()), 'Read data...')
+
+#list of new attributes, important for calculating cycling quality index
+new_attributes_dict = {
+        'way_type': 'String',
+        'index': 'Int',
+        'index_10': 'Int',
+        'stress_level': 'Int',
+        'offset': 'Double',
+        'offset_cycleway_left': 'Double',
+        'offset_cycleway_right': 'Double',
+        'offset_sidewalk_left': 'Double',
+        'offset_sidewalk_right': 'Double',
+        'type': 'String',
+        'side': 'String',
+        'proc_width': 'Double',
+        'proc_surface': 'String',
+        'proc_smoothness': 'String',
+        'proc_oneway': 'String',
+        'proc_sidepath': 'String',
+        'proc_highway': 'String',
+        'proc_maxspeed': 'Int',
+        'proc_traffic_mode_left': 'String',
+        'proc_traffic_mode_right': 'String',
+        'proc_separation_left': 'String',
+        'proc_separation_right': 'String',
+        'proc_buffer_left': 'Double',
+        'proc_buffer_right': 'Double',
+        'proc_mandatory': 'String',
+        'proc_traffic_sign': 'String',
+        'fac_width': 'Double',
+        'fac_surface': 'Double',
+        'fac_highway': 'Double',
+        'fac_maxspeed': 'Double',
+        'fac_protection_level': 'Double',
+        'prot_level_separation_left': 'Double',
+        'prot_level_separation_right': 'Double',
+        'prot_level_buffer_left': 'Double',
+        'prot_level_buffer_right': 'Double',
+        'prot_level_left': 'Double',
+        'prot_level_right': 'Double',
+        'base_index': 'Int',
+        'fac_1': 'Double',
+        'fac_2': 'Double',
+        'fac_3': 'Double',
+        'fac_4': 'Double',
+        'data_bonus': 'String',
+        'data_malus': 'String',
+        'data_incompleteness': 'Double',
+        'data_missing': 'String',
+        'data_missing_width': 'Int',
+        'data_missing_surface': 'Int',
+        'data_missing_smoothness': 'Int',
+        'data_missing_maxspeed': 'Int',
+        'data_missing_parking': 'Int',
+        'data_missing_lit': 'Int',
+        'filter_usable': 'Int',
+        'filter_way_type': 'String'
+    }
+
+qgis_layers = {}
+
+def check_sidepath(sidepath_dict, id, key, checks):
+    for item in sidepath_dict[id][key].keys():
+        if checks <= 2:
+            if sidepath_dict[id][key][item] == checks:
+                return 'yes'
+        else:
+            if sidepath_dict[id][key][item] >= checks * 0.66:
+                return 'yes'
+    return 'no'
 
 
 #--------------------------------
 #      S c r i p t   S t a r t
 #--------------------------------
+def main():
+    if not exists(dir_input + file_format):
+        if multi_input:
+            print(time.strftime('%H:%M:%S', time.localtime()), '[!] Error: No valid input files at "' + dir_input + '*' + file_format + '".')
+        else:
+            print(time.strftime('%H:%M:%S', time.localtime()), '[!] Error: No valid input file at "' + dir_input + file_format + '".')
+        return False
 
-print(time.strftime('%H:%M:%S', time.localtime()), 'Start processing:')
-
-print(time.strftime('%H:%M:%S', time.localtime()), 'Read data...')
-
-#multiple input files can be merged to one single input
-if multi_input:
-    input_data = []
-    i = 1
-    while exists(dir_input + str(i) + file_format):
-        print(time.strftime('%H:%M:%S', time.localtime()), '   Read input file ' + str(i) + '...')
-        layer_way_input = QgsVectorLayer(dir_input + str(i) + file_format + '|geometrytype=LineString', 'way input', 'ogr')
-        layer_way_input = processing.run('native:retainfields', { 'INPUT' : layer_way_input, 'FIELDS' : p.attributes_list, 'OUTPUT': 'memory:'})['OUTPUT']
-        input_data.append(layer_way_input)
-        i += 1
-    if input_data:
-        print(time.strftime('%H:%M:%S', time.localtime()), '   Merge input files...')
-        layer_way_input = processing.run('native:mergevectorlayers', { 'LAYERS' : input_data, 'OUTPUT': 'memory:'})['OUTPUT']
-        layer_way_input = processing.run('native:deleteduplicategeometries', {'INPUT': layer_way_input, 'OUTPUT': dir_input + file_format })
-    else:
-        print(time.strftime('%H:%M:%S', time.localtime()), '[!] Warning: No valid input files at "' + dir_input + '*' + file_format + '". Use ascending numbers starting with 1 at the end of the file names.')
-        if exists(dir_input + file_format):
-            print(time.strftime('%H:%M:%S', time.localtime()), '[!] Warning: Continuing with input file "' + dir_input + file_format + '".')
-
-if not exists(dir_input + file_format):
-    if multi_input:
-        print(time.strftime('%H:%M:%S', time.localtime()), '[!] Error: No valid input files at "' + dir_input + '*' + file_format + '".')
-    else:
-        print(time.strftime('%H:%M:%S', time.localtime()), '[!] Error: No valid input file at "' + dir_input + file_format + '".')
-else:
     layer_way_input = QgsVectorLayer(dir_input + file_format + '|geometrytype=LineString', 'way input', 'ogr')
 
     print(time.strftime('%H:%M:%S', time.localtime()), 'Reproject data...')
@@ -73,63 +125,6 @@ else:
     #delete unneeded attributes
     layer = processing.run('native:retainfields', { 'INPUT' : layer, 'FIELDS' : p.attributes_list, 'OUTPUT': 'memory:'})['OUTPUT']
 
-    #list of new attributes, important for calculating cycling quality index
-    new_attributes_dict = {
-    'way_type': 'String',
-    'index': 'Int',
-    'index_10': 'Int',
-    'stress_level': 'Int',
-    'offset': 'Double',
-    'offset_cycleway_left': 'Double',
-    'offset_cycleway_right': 'Double',
-    'offset_sidewalk_left': 'Double',
-    'offset_sidewalk_right': 'Double',
-    'type': 'String',
-    'side': 'String',
-    'proc_width': 'Double',
-    'proc_surface': 'String',
-    'proc_smoothness': 'String',
-    'proc_oneway': 'String',
-    'proc_sidepath': 'String',
-    'proc_highway': 'String',
-    'proc_maxspeed': 'Int',
-    'proc_traffic_mode_left': 'String',
-    'proc_traffic_mode_right': 'String',
-    'proc_separation_left': 'String',
-    'proc_separation_right': 'String',
-    'proc_buffer_left': 'Double',
-    'proc_buffer_right': 'Double',
-    'proc_mandatory': 'String',
-    'proc_traffic_sign': 'String',
-    'fac_width': 'Double',
-    'fac_surface': 'Double',
-    'fac_highway': 'Double',
-    'fac_maxspeed': 'Double',
-    'fac_protection_level': 'Double',
-    'prot_level_separation_left': 'Double',
-    'prot_level_separation_right': 'Double',
-    'prot_level_buffer_left': 'Double',
-    'prot_level_buffer_right': 'Double',
-    'prot_level_left': 'Double',
-    'prot_level_right': 'Double',
-    'base_index': 'Int',
-    'fac_1': 'Double',
-    'fac_2': 'Double',
-    'fac_3': 'Double',
-    'fac_4': 'Double',
-    'data_bonus': 'String',
-    'data_malus': 'String',
-    'data_incompleteness': 'Double',
-    'data_missing': 'String',
-    'data_missing_width': 'Int',
-    'data_missing_surface': 'Int',
-    'data_missing_smoothness': 'Int',
-    'data_missing_maxspeed': 'Int',
-    'data_missing_parking': 'Int',
-    'data_missing_lit': 'Int',
-    'filter_usable': 'Int',
-    'filter_way_type': 'String'
-    }
     for attr in list(new_attributes_dict.keys()):
         p.attributes_list.append(attr)
 
@@ -259,6 +254,7 @@ else:
             road_highway = road.attribute('highway')
             road_name = road.attribute('name')
             road_maxspeed = d.getNumber(road.attribute('maxspeed'))
+            # print(road_maxspeed)
             if not road_id in id_list:
                 id_list.append(road_id)
             if not road_highway in highway_list:
@@ -300,45 +296,28 @@ else:
                 maxspeed = 299
             if not maxspeed and hw == 'living_street':
                 maxspeed = 10
-            if not hw in ['cycleway', 'footway', 'path', 'bridleway', 'steps']:
+            if not hw in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
                 layer.changeAttributeValue(feature.id(), id_proc_highway, hw)
                 layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(maxspeed))
                 continue
             id = feature.attribute('id')
+            if not sidepath_dict.get(id, {}):
+                continue
             is_sidepath = feature.attribute('is_sidepath')
             if feature.attribute('footway') == 'sidewalk':
                 is_sidepath = 'yes'
             is_sidepath_of = feature.attribute('is_sidepath:of')
-            checks = sidepath_dict[id]['checks']
+            checks = sidepath_dict.get(id, {}).get('checks', 1)
 
             if not is_sidepath:
                 is_sidepath = 'no'
 
-                for road_id in sidepath_dict[id]['id'].keys():
-                    if checks <= 2:
-                        if sidepath_dict[id]['id'][road_id] == checks:
-                            is_sidepath = 'yes'
-                    else:
-                        if sidepath_dict[id]['id'][road_id] >= checks * 0.66:
-                            is_sidepath = 'yes'
-
                 if is_sidepath != 'yes':
-                    for highway in sidepath_dict[id]['highway'].keys():
-                        if checks <= 2:
-                            if sidepath_dict[id]['highway'][highway] == checks:
-                                is_sidepath = 'yes'
-                        else:
-                            if sidepath_dict[id]['highway'][highway] >= checks * 0.66:
-                                is_sidepath = 'yes'
-
+                    is_sidepath = check_sidepath(sidepath_dict, id, 'id', checks)
                 if is_sidepath != 'yes':
-                    for name in sidepath_dict[id]['name'].keys():
-                        if checks <= 2:
-                            if sidepath_dict[id]['name'][name] == checks:
-                                is_sidepath = 'yes'
-                        else:
-                            if sidepath_dict[id]['name'][name] >= checks * 0.66:
-                                is_sidepath = 'yes'
+                    is_sidepath = check_sidepath(sidepath_dict, id, 'highway', checks)
+                if is_sidepath != 'yes':
+                    is_sidepath = check_sidepath(sidepath_dict, id, 'name', checks)
 
             layer.changeAttributeValue(feature.id(), id_proc_sidepath, is_sidepath)
 
@@ -349,6 +328,8 @@ else:
                     max_keys = [key for key, value in sidepath_dict[id]['highway'].items() if value == max_value]
                     min_index = len(highway_class_list) - 1
                     for key in max_keys:
+                        if not key in highway_class_list:
+                            continue
                         if highway_class_list.index(key) < min_index:
                             min_index = highway_class_list.index(key)
                     is_sidepath_of = highway_class_list[min_index]
@@ -440,12 +421,16 @@ else:
 
         processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_cycleway_left\" IS NOT NULL'})
         offset_cycleway_left_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('"offset_cycleway_left"'), 'OUTPUT': 'memory:'})['OUTPUT']
+        qgis_layers['offset_cycleway_left_layer'] = offset_cycleway_left_layer
         processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_cycleway_right\" IS NOT NULL'})
         offset_cycleway_right_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('-"offset_cycleway_right"'), 'OUTPUT': 'memory:'})['OUTPUT']
+        qgis_layers['offset_cycleway_right_layer'] = offset_cycleway_right_layer
         processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_sidewalk_left\" IS NOT NULL'})
         offset_sidewalk_left_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('"offset_sidewalk_left"'), 'OUTPUT': 'memory:'})['OUTPUT']
+        qgis_layers['offset_sidewalk_left_layer'] = offset_sidewalk_left_layer
         processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_sidewalk_right\" IS NOT NULL'})
         offset_sidewalk_right_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('-"offset_sidewalk_right"'), 'OUTPUT': 'memory:'})['OUTPUT']
+        qgis_layers['offset_sidewalk_left_layer'] = offset_sidewalk_left_layer
 
         #TODO: offset als Attribut überschreiben
         #eigenständige Attribute ableiten
@@ -456,7 +441,10 @@ else:
     for side in ['left', 'right']:
         for type in ['cycleway', 'sidewalk']:
             layer_name = 'offset_' + type + '_' + side + '_layer'
-            exec("%s = %s" % ('offset_layer', layer_name))
+            # exec("%s = %s" % ('offset_layer', layer_name))
+            offset_layer = qgis_layers.get(layer_name, None)
+            if offset_layer is None:
+                continue
             with edit(offset_layer):
                 for feature in offset_layer.getFeatures():
                     offset_layer.changeAttributeValue(feature.id(), id_offset, feature.attribute('offset_' + type + '_' + side))
@@ -465,7 +453,7 @@ else:
                     #this offset geometries are sidepath
                     offset_layer.changeAttributeValue(feature.id(), id_proc_sidepath, 'yes')
                     offset_layer.changeAttributeValue(feature.id(), id_proc_highway, feature.attribute('highway'))
-                    offset_layer.changeAttributeValue(feature.id(), id_proc_maxspeed, feature.attribute('maxspeed'))
+                    offset_layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(feature.attribute('maxspeed')))
 
                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('width'), d.deriveAttribute(feature, 'width', type, side, 'float'))
                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway'), d.deriveAttribute(feature, 'oneway', type, side, 'str'))
@@ -1653,5 +1641,27 @@ else:
     layer.loadNamedStyle(project_dir + 'styles/index.qml')
     #focus on output layer
     iface.mapCanvas().setExtent(layer.extent())
+
+
+#multiple input files can be merged to one single input
+if multi_input:
+    input_data = []
+    i = 1
+    while exists(dir_input + str(i) + file_format):
+        print(time.strftime('%H:%M:%S', time.localtime()), '   Read input file ' + str(i) + '...')
+        layer_way_input = QgsVectorLayer(dir_input + str(i) + file_format + '|geometrytype=LineString', 'way input', 'ogr')
+        layer_way_input = processing.run('native:retainfields', { 'INPUT' : layer_way_input, 'FIELDS' : p.attributes_list, 'OUTPUT': 'memory:'})['OUTPUT']
+        input_data.append(layer_way_input)
+        i += 1
+    if input_data:
+        print(time.strftime('%H:%M:%S', time.localtime()), '   Merge input files...')
+        layer_way_input = processing.run('native:mergevectorlayers', { 'LAYERS' : input_data, 'OUTPUT': 'memory:'})['OUTPUT']
+        layer_way_input = processing.run('native:deleteduplicategeometries', {'INPUT': layer_way_input, 'OUTPUT': dir_input + file_format })
+    else:
+        print(time.strftime('%H:%M:%S', time.localtime()), '[!] Warning: No valid input files at "' + dir_input + '*' + file_format + '". Use ascending numbers starting with 1 at the end of the file names.')
+        if exists(dir_input + file_format):
+            print(time.strftime('%H:%M:%S', time.localtime()), '[!] Warning: Continuing with input file "' + dir_input + file_format + '".')
+
+main()
 
 print(time.strftime('%H:%M:%S', time.localtime()), 'Finished processing.')
