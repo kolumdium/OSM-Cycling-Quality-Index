@@ -87,6 +87,7 @@ def determine_maxspeed(feature, hw):
         return 10
     return d.getNumber(maxspeed)
 
+
 def check_sidepath(sidepath_dict, id, key, checks):
     key_dict = sidepath_dict[id].get(key, {})
     if sum(key_dict.values()) >= (2/3) * checks:
@@ -169,11 +170,121 @@ def update_sidepath_attributes(layer, sidepath_dict, field_ids, highway_class_li
                 is_sidepath_of = update_feature_highway_class(feature, sidepath_dict, field_ids, highway_class_list)
                 layer.updateFeature(feature)
                 transfer_maxspeed(feature, sidepath_dict, field_ids)
-                # layer.updateFeature(feature)
                 transfer_sidepath_names(feature, sidepath_dict, field_ids)
                 layer.updateFeature(feature)
-            # layer.updateFeature(feature)
-        # layer.commitChanges()
+
+
+def calculate_offset_cycleway(offset_distance, width):
+    #TODO: more precise offset calculation taking "parking:", "placement", "width:lanes" and other Tags into account
+    if offset_distance == 'realistic':
+        return width / 2
+    else:
+        return d.getNumber(offset_distance)
+
+
+def calculate_offset_sidewalk(offset_distance, width):
+    if offset_distance == 'realistic':
+        return width / 2 + 2
+    else:
+        return d.getNumber(offset_distance)
+    
+
+def update_offset_attributes(layer, field_ids, p):
+    for feature in layer.getFeatures():
+        highway = feature.attribute('highway')
+        offset_cycleway_left = offset_cycleway_right = offset_sidewalk_left = offset_sidewalk_right = 0
+        width = 0
+
+        if p.offset_distance == 'realistic':
+            width = d.getNumber(feature.attribute('width')) or p.default_highway_width_dict.get(highway, p.default_highway_width_fallback)
+
+        cycleway_conditions = ['lane', 'track', 'share_busway']
+        cycleway_features_left = [feature.attribute('cycleway'), feature.attribute('cycleway:both'), feature.attribute('cycleway:left')]
+        cycleway_features_right = [feature.attribute('cycleway'), feature.attribute('cycleway:both'), feature.attribute('cycleway:right')]
+
+        sidewalk_conditions = ['yes', 'designated', 'permissive']
+        sidewalk_features_left = [feature.attribute('sidewalk:bicycle'), feature.attribute('sidewalk:both:bicycle'), feature.attribute('sidewalk:left:bicycle')]
+        sidewalk_features_right = [feature.attribute('sidewalk:bicycle'), feature.attribute('sidewalk:both:bicycle'), feature.attribute('sidewalk:right:bicycle')]
+
+        if any(cw in cycleway_conditions for cw in cycleway_features_left):
+            offset_cycleway_left = calculate_offset_cycleway(p.offset_distance, width)
+            layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_left'), offset_cycleway_left)
+
+        if any(cw in cycleway_conditions for cw in cycleway_features_right):
+            offset_cycleway_right = calculate_offset_cycleway(p.offset_distance, width)
+            layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_right'), offset_cycleway_right)
+
+        if any(sw in sidewalk_conditions for sw in sidewalk_features_left):
+            offset_sidewalk_left = calculate_offset_sidewalk(p.offset_distance, width)
+            layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_left'), offset_sidewalk_left)
+
+        if any(sw in sidewalk_conditions for sw in sidewalk_features_right):
+            offset_sidewalk_right = calculate_offset_sidewalk(p.offset_distance, width)
+            layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_right'), offset_sidewalk_right)
+
+
+
+def process_offset_lines(layer, expression, distance_expression, output_key, qgis_layers):
+    processing.run('qgis:selectbyexpression', {'INPUT': layer, 'EXPRESSION': expression})
+    offset_layer = processing.run('native:offsetline', {
+        'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True),
+        'DISTANCE': QgsProperty.fromExpression(distance_expression),
+        'OUTPUT': 'memory:'
+    })['OUTPUT']
+    qgis_layers[output_key] = offset_layer
+
+
+def update_offset_layer_attributes(layer, field_ids, qgis_layers, d):
+    def set_common_attributes(feature, offset_layer, type, side):
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get('offset'), feature.attribute(f'offset_{type}_{side}'))
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get('type'), type)
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get('side'), side)
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), 'yes')
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), feature.attribute('highway'))
+        offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(feature.attribute('maxspeed')))
+
+        attributes = ['width', 'oneway', 'oneway:bicycle', 'traffic_sign']
+        for attr in attributes:
+            offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf(attr), d.deriveAttribute(feature, attr, type, side, 'str' if 'oneway' in attr else 'float'))
+
+    def set_implicit_surface_smoothness(feature, offset_layer, type, side):
+        if type != 'cycleway' or (feature.attribute(f'cycleway:{side}') == 'track' 
+                                or feature.attribute('cycleway:both') == 'track'
+                                or feature.attribute('cycleway') == 'track'
+                                or any(feature.attribute(f'{type}:{side}:{attr}') is not None for attr in ['surface', 'smoothness'])):
+                offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf(
+                    'surface'), d.deriveAttribute(feature, 'surface', 'cycleway', side, 'str'))
+                offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf(
+                    'smoothness'), d.deriveAttribute(feature, 'smoothness', 'cycleway', side, 'str'))
+
+    def set_cycleway_attributes(feature, offset_layer, side):
+        cycleway_attributes = ['separation', 'separation:both', 'separation:left', 'separation:right',
+                       'buffer', 'buffer:both', 'buffer:left' , 'buffer:right',
+                       'traffic_mode:both', 'traffic_mode:left', 'traffic_mode:right', 'surface:colour']
+
+        for attr in cycleway_attributes:
+            offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf(attr), d.deriveAttribute(feature, attr, 'cycleway', side, 'str'))
+
+
+    for side in ['left', 'right']:
+        for type in ['cycleway', 'sidewalk']:
+            layer_name = f'offset_{type}_{side}_layer'
+            offset_layer = qgis_layers.get(layer_name, None)
+            if offset_layer is None:
+                continue
+
+            with edit(offset_layer):
+                for feature in offset_layer.getFeatures():
+                    set_common_attributes(feature, offset_layer, type, side)
+                    set_implicit_surface_smoothness(feature, offset_layer, type, side)
+                    if type == 'cycleway':
+                        set_cycleway_attributes(feature, offset_layer, side)
+
+
+def merge_layers(layer, qgis_layers):
+    layers_to_merge = [layer] + list(qgis_layers.values())
+    return processing.run('native:mergevectorlayers', {'LAYERS': layers_to_merge, 'OUTPUT': 'memory:'})['OUTPUT']
+
 
 print_timestamped_message('Start processing:')
 print_timestamped_message('Read data...')
@@ -377,206 +488,88 @@ def main():
     highway_class_list = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'unclassified', 'residential', 'road', 'living_street', 'service', 'pedestrian', NULL]
 
     update_sidepath_attributes(layer, sidepath_dict, field_ids, highway_class_list)
-    # with edit(layer):
-    #     for feature in layer.getFeatures():
-    #         hw = feature.attribute('highway')
-    #         maxspeed = determine_maxspeed(feature, hw)
 
-    #         if not hw in ['cycleway', 'footway', 'path', 'bridleway', 'steps', 'bridleway, track']:
-    #             # layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), hw)
-    #             # layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), maxspeed)
-    #             feature.setAttribute(field_ids.get("proc_highway"), hw)
-    #             feature.setAttribute(field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
-    #             continue
-
-    #         id = feature.attribute('id')
-    #         if id not in sidepath_dict:
-    #             continue
-
-    #         is_sidepath = feature.attribute('is_sidepath')
-    #         if feature.attribute('footway') == 'sidewalk':
-    #             is_sidepath = 'yes'
-    #         is_sidepath_of = feature.attribute('is_sidepath:of')
-    #         checks = sidepath_dict.get(id, {}).get('checks', 1)
-
-    #         if not is_sidepath:
-    #             is_sidepath = 'no'
-
-    #             if is_sidepath != 'yes':
-    #                 is_sidepath = check_sidepath(sidepath_dict, id, 'id', checks)
-    #             if is_sidepath != 'yes':
-    #                 is_sidepath = check_sidepath(sidepath_dict, id, 'highway', checks)
-    #             if is_sidepath != 'yes':
-    #                 is_sidepath = check_sidepath(sidepath_dict, id, 'name', checks)
-
-    #         layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), is_sidepath)
-
-    #         #derive the highway class of the associated road
-    #         if not is_sidepath_of and is_sidepath == 'yes':
-    #             if len(sidepath_dict[id]['highway']):
-    #                 max_value = max(sidepath_dict[id]['highway'].values())
-    #                 max_keys = [key for key, value in sidepath_dict[id]['highway'].items() if value == max_value]
-    #                 min_index = len(highway_class_list) - 1
-    #                 for key in max_keys:
-    #                     if not key in highway_class_list:
-    #                         continue
-    #                     if highway_class_list.index(key) < min_index:
-    #                         min_index = highway_class_list.index(key)
-    #                 is_sidepath_of = highway_class_list[min_index]
-
-    #         layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), is_sidepath_of)
-
-    #         if is_sidepath == 'yes' and is_sidepath_of and is_sidepath_of in sidepath_dict[id]['maxspeed']:
-    #             maxspeed = sidepath_dict[id]['maxspeed'][is_sidepath_of]
-    #             if maxspeed:
-    #                 layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(maxspeed))
-    #         #transfer names to sidepath
-    #         if is_sidepath == 'yes' and len(sidepath_dict[id]['name']):
-    #             name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k]) #the most frequent name in the surrounding
-    #             if name:
-    #                 layer.changeAttributeValue(feature.id(), layer.fields().indexOf('name'), name)
 
     #-------------------------------------------------------------------------------#
     #2: Split and shift attributes/geometries for sidepath mapped on the centerline #
     #-------------------------------------------------------------------------------#
 
-    print(time.strftime('%H:%M:%S', time.localtime()), 'Split line bundles...')
+    print_timestamped_message('Split line bundles...')
     with edit(layer):
-        for feature in layer.getFeatures():
-            highway = feature.attribute('highway')
-            cycleway = feature.attribute('cycleway')
-            cycleway_both = feature.attribute('cycleway:both')
-            cycleway_left = feature.attribute('cycleway:left')
-            cycleway_right = feature.attribute('cycleway:right')
-            sidewalk_bicycle = feature.attribute('sidewalk:bicycle')
-            sidewalk_both_bicycle = feature.attribute('sidewalk:both:bicycle')
-            sidewalk_left_bicycle = feature.attribute('sidewalk:left:bicycle')
-            sidewalk_right_bicycle = feature.attribute('sidewalk:right:bicycle')
+        update_offset_attributes(layer, field_ids, p)
+        expressions = [
+            ('\"offset_cycleway_left\" IS NOT NULL', '"offset_cycleway_left"', 'offset_cycleway_left_layer'),
+            ('\"offset_cycleway_right\" IS NOT NULL', '-"offset_cycleway_right"', 'offset_cycleway_right_layer'),
+            ('\"offset_sidewalk_left\" IS NOT NULL', '"offset_sidewalk_left"', 'offset_sidewalk_left_layer'),
+            ('\"offset_sidewalk_right\" IS NOT NULL', '-"offset_sidewalk_right"', 'offset_sidewalk_right_layer')
+        ]
 
-            offset_cycleway_left = offset_cycleway_right = offset_sidewalk_left = offset_sidewalk_right = 0
-            side = NULL
-
-            #TODO: more precise offset calculation taking "parking:", "placement", "width:lanes" and other Tags into account
-            if p.offset_distance == 'realistic':
-                #use road width as offset for the new geometry
-                width = d.getNumber(feature.attribute('width'))
-
-                #use default road width if width isn't specified
-                if not width:
-                    if highway in p.default_highway_width_dict:
-                        width = p.default_highway_width_dict[highway]
-                    else:
-                        width = p.default_highway_width_fallback
-
-            #offset for cycleways
-            if highway != 'cycleway':
-                #offset for left cycleways
-                if cycleway in ['lane', 'track', 'share_busway'] or cycleway_both in ['lane', 'track', 'share_busway'] or cycleway_left in ['lane', 'track', 'share_busway']:
-                    #option 1: offset of sidepath lines according to real distances on the ground
-                    if p.offset_distance == 'realistic':
-                        offset_cycleway_left = width / 2
-                    #option 2: static offset as defined in the variable
-                    else:
-                        offset_cycleway_left = d.getNumber(p.offset_distance)
-                    layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_left'), offset_cycleway_left)
-
-                #offset for right cycleways
-                if cycleway in ['lane', 'track', 'share_busway'] or cycleway_both in ['lane', 'track', 'share_busway'] or cycleway_right in ['lane', 'track', 'share_busway']:
-                    if p.offset_distance == 'realistic':
-                        offset_cycleway_right = width / 2
-                    else:
-                        offset_cycleway_right = d.getNumber(p.offset_distance)
-                    layer.changeAttributeValue(feature.id(), field_ids.get('offset_cycleway_right'), offset_cycleway_right)
-
-            #offset for shared footways
-            #offset for left sidewalks
-            if sidewalk_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_both_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_left_bicycle in ['yes', 'designated', 'permissive']:
-                if p.offset_distance == 'realistic':
-                    #use larger offset than for cycleways to get nearby, parallel lines in case both (cycleway and sidewalk) exist
-                    offset_sidewalk_left = width / 2 + 2
-                else:
-                    #TODO: double offset if cycleway exists on same side
-                    offset_sidewalk_left = d.getNumber(p.offset_distance)
-                layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_left'), offset_sidewalk_left)
-
-            #offset for right sidewalks
-            if sidewalk_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_both_bicycle in ['yes', 'designated', 'permissive'] or sidewalk_right_bicycle in ['yes', 'designated', 'permissive']:
-                if p.offset_distance == 'realistic':
-                    offset_sidewalk_right = width / 2 + 2
-                else:
-                    offset_sidewalk_right = d.getNumber(p.offset_distance)
-                layer.changeAttributeValue(feature.id(), field_ids.get('offset_sidewalk_right'), offset_sidewalk_right)
-
-        processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_cycleway_left\" IS NOT NULL'})
-        offset_cycleway_left_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('"offset_cycleway_left"'), 'OUTPUT': 'memory:'})['OUTPUT']
-        qgis_layers['offset_cycleway_left_layer'] = offset_cycleway_left_layer
-        processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_cycleway_right\" IS NOT NULL'})
-        offset_cycleway_right_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('-"offset_cycleway_right"'), 'OUTPUT': 'memory:'})['OUTPUT']
-        qgis_layers['offset_cycleway_right_layer'] = offset_cycleway_right_layer
-        processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_sidewalk_left\" IS NOT NULL'})
-        offset_sidewalk_left_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('"offset_sidewalk_left"'), 'OUTPUT': 'memory:'})['OUTPUT']
-        qgis_layers['offset_sidewalk_left_layer'] = offset_sidewalk_left_layer
-        processing.run('qgis:selectbyexpression', {'INPUT' : layer, 'EXPRESSION' : '\"offset_sidewalk_right\" IS NOT NULL'})
-        offset_sidewalk_right_layer = processing.run('native:offsetline', {'INPUT': QgsProcessingFeatureSourceDefinition(layer.id(), selectedFeaturesOnly=True), 'DISTANCE': QgsProperty.fromExpression('-"offset_sidewalk_right"'), 'OUTPUT': 'memory:'})['OUTPUT']
-        qgis_layers['offset_sidewalk_left_layer'] = offset_sidewalk_left_layer
-
-        #TODO: offset als Attribut überschreiben
-        #eigenständige Attribute ableiten
-
+        for expression, distance_expression, output_key in expressions:
+            process_offset_lines(layer, expression, distance_expression, output_key, qgis_layers)
         layer.updateFields()
-
-    #derive attributes for offset ways
-    for side in ['left', 'right']:
-        for type in ['cycleway', 'sidewalk']:
-            layer_name = 'offset_' + type + '_' + side + '_layer'
-            # exec("%s = %s" % ('offset_layer', layer_name))
-            offset_layer = qgis_layers.get(layer_name, None)
-            if offset_layer is None:
-                continue
-            with edit(offset_layer):
-                for feature in offset_layer.getFeatures():
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('offset'), feature.attribute('offset_' + type + '_' + side))
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('type'), type)
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get('side'), side)
-                    #this offset geometries are sidepath
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), 'yes')
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), feature.attribute('highway'))
-                    offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(feature.attribute('maxspeed')))
-
-                    offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('width'), d.deriveAttribute(feature, 'width', type, side, 'float'))
-                    offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway'), d.deriveAttribute(feature, 'oneway', type, side, 'str'))
-                    offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway:bicycle'), d.deriveAttribute(feature, 'oneway:bicycle', type, side, 'str'))
-                    offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_sign'), d.deriveAttribute(feature, 'traffic_sign', type, side, 'str'))
-
-                    #surface and smoothness of cycle lanes are usually the same as on the road (if not explicitely tagged)
-                    if type != 'cycleway' or (type == 'cycleway' and ((feature.attribute('cycleway:' + side) == 'track' or feature.attribute('cycleway:both') == 'track' or feature.attribute('cycleway') == 'track') or feature.attribute(type + ':' + side + ':surface') != NULL or feature.attribute(type + ':both:surface') != NULL or feature.attribute(type + ':surface') != NULL)):
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('surface'), d.deriveAttribute(feature, 'surface', type, side, 'str'))
-                    if type != 'cycleway' or (type == 'cycleway' and ((feature.attribute('cycleway:' + side) == 'track' or feature.attribute('cycleway:both') == 'track' or feature.attribute('cycleway') == 'track') or feature.attribute(type + ':' + side + ':smoothness') != NULL or feature.attribute(type + ':both:smoothness') != NULL or feature.attribute(type + ':smoothness') != NULL)):
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('smoothness'), d.deriveAttribute(feature, 'smoothness', type, side, 'str'))
-
-                    if type == 'cycleway':
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation'), d.deriveAttribute(feature, 'separation', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:both'), d.deriveAttribute(feature, 'separation:both', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:left'), d.deriveAttribute(feature, 'separation:left', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:right'), d.deriveAttribute(feature, 'separation:right', type, side, 'str'))
-
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer'), d.deriveAttribute(feature, 'buffer', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:both'), d.deriveAttribute(feature, 'buffer:both', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:left'), d.deriveAttribute(feature, 'buffer:left', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:right'), d.deriveAttribute(feature, 'buffer:right', type, side, 'str'))
-
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:both'), d.deriveAttribute(feature, 'traffic_mode:both', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:left'), d.deriveAttribute(feature, 'traffic_mode:left', type, side, 'str'))
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:right'), d.deriveAttribute(feature, 'traffic_mode:right', type, side, 'str'))
-
-                        offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('surface:colour'), d.deriveAttribute(feature, 'surface:colour', type, side, 'str'))
-
+    
+    update_offset_layer_attributes(layer, field_ids, qgis_layers, d)
     #TODO: Attribute mit "both" auf left und right aufteilen?
 
     #TODO: clean up offset layers
+    merge_layers(layer, qgis_layers)
+    # #derive attributes for offset ways
+    # for side in ['left', 'right']:
+    #     for type in ['cycleway', 'sidewalk']:
+    #         layer_name = 'offset_' + type + '_' + side + '_layer'
+    #         # exec("%s = %s" % ('offset_layer', layer_name))
+    #         offset_layer = qgis_layers.get(layer_name, None)
+    #         if offset_layer is None:
+    #             continue
+    #         with edit(offset_layer):
+    #             for feature in offset_layer.getFeatures():
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get('offset'), feature.attribute('offset_' + type + '_' + side))
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get('type'), type)
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get('side'), side)
+    #                 #this offset geometries are sidepath
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_sidepath"), 'yes')
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_highway"), feature.attribute('highway'))
+    #                 offset_layer.changeAttributeValue(feature.id(), field_ids.get("proc_maxspeed"), d.getNumber(feature.attribute('maxspeed')))
 
-    #merge vanilla and offset layers
-    layer = processing.run('native:mergevectorlayers', {'LAYERS' : [layer, offset_cycleway_left_layer, offset_cycleway_right_layer, offset_sidewalk_left_layer, offset_sidewalk_right_layer], 'OUTPUT': 'memory:'})['OUTPUT']
+    #                 offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('width'), d.deriveAttribute(feature, 'width', type, side, 'float'))
+    #                 offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway'), d.deriveAttribute(feature, 'oneway', type, side, 'str'))
+    #                 offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('oneway:bicycle'), d.deriveAttribute(feature, 'oneway:bicycle', type, side, 'str'))
+    #                 offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_sign'), d.deriveAttribute(feature, 'traffic_sign', type, side, 'str'))
+
+    #                 #surface and smoothness of cycle lanes are usually the same as on the road (if not explicitely tagged)
+    #                 if type != 'cycleway' or (type == 'cycleway' and ((feature.attribute('cycleway:' + side) == 'track' or feature.attribute('cycleway:both') == 'track' or feature.attribute('cycleway') == 'track') or feature.attribute(type + ':' + side + ':surface') != NULL or feature.attribute(type + ':both:surface') != NULL or feature.attribute(type + ':surface') != NULL)):
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('surface'), d.deriveAttribute(feature, 'surface', type, side, 'str'))
+    #                 if type != 'cycleway' or (type == 'cycleway' and ((feature.attribute('cycleway:' + side) == 'track' or feature.attribute('cycleway:both') == 'track' or feature.attribute('cycleway') == 'track') or feature.attribute(type + ':' + side + ':smoothness') != NULL or feature.attribute(type + ':both:smoothness') != NULL or feature.attribute(type + ':smoothness') != NULL)):
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('smoothness'), d.deriveAttribute(feature, 'smoothness', type, side, 'str'))
+
+    #                 if type == 'cycleway':
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation'), d.deriveAttribute(feature, 'separation', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:both'), d.deriveAttribute(feature, 'separation:both', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:left'), d.deriveAttribute(feature, 'separation:left', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('separation:right'), d.deriveAttribute(feature, 'separation:right', type, side, 'str'))
+
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer'), d.deriveAttribute(feature, 'buffer', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:both'), d.deriveAttribute(feature, 'buffer:both', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:left'), d.deriveAttribute(feature, 'buffer:left', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('buffer:right'), d.deriveAttribute(feature, 'buffer:right', type, side, 'str'))
+
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:both'), d.deriveAttribute(feature, 'traffic_mode:both', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:left'), d.deriveAttribute(feature, 'traffic_mode:left', type, side, 'str'))
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:right'), d.deriveAttribute(feature, 'traffic_mode:right', type, side, 'str'))
+
+    #                     offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('surface:colour'), d.deriveAttribute(feature, 'surface:colour', type, side, 'str'))
+
+    # #TODO: Attribute mit "both" auf left und right aufteilen?
+
+    # #TODO: clean up offset layers
+
+    # #merge vanilla and offset layers
+    # offset_cycleway_left_layer = qgis_layers.get('offset_cycleway_left_layer', None)
+    # offset_cycleway_right_layer = qgis_layers.get('offset_cycleway_right_layer', None)
+    # offset_sidewalk_left_layer = qgis_layers.get('offset_sidewalk_left_layer', None)
+    # offset_sidewalk_right_layer = qgis_layers.get('offset_sidewalk_right_layer', None)
+    
+    # layer = processing.run('native:mergevectorlayers', {'LAYERS' : [layer, offset_cycleway_left_layer, offset_cycleway_right_layer, offset_sidewalk_left_layer, offset_sidewalk_right_layer], 'OUTPUT': 'memory:'})['OUTPUT']
 
 
 
