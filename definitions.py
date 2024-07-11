@@ -77,8 +77,11 @@ def getAccess(feature, access_key):
 def getNumber(value):
     if value != NULL:
         try:
+            # Split the string by comma and take the first part
+            # value = value.split(',')[0].strip() # weird osm entries where people put maxspeed = 50, 70 ...
             value = float(value)
-        except:
+        except Exception as e:
+            print("Get Number raised the following error {0}".format(e))
             value = NULL
     return(value)
 

@@ -248,7 +248,10 @@ motor_vehicle_access_index_dict = {
 #list of traffic signs, that make a way or path mandatory to use for cyclists
 #this lists are for DE:; adjust it if needed
 mandatory_traffic_sign_list = ['237', '240', '241']
+mandatory_traffic_sign_set = set(('237', '240', '241'))
+
 not_mandatory_traffic_sign_list = ['none', '1022']
+not_mandatory_traffic_sign_set = set(('none', '1022'))
 
 #missing data values and how much they wight for a data (in)completeness number
 data_incompleteness_dict = {
