@@ -897,18 +897,104 @@ def assure_default_width(feature, proc_oneway):
     return width
 
 
+def get_default_surface(feature, way_type):
+    if way_type in ['cycle lane (advisory)', 'cycle lane (exclusive)', 'cycle lane (protected)', 'cycle lane (central)']:
+        return p.default_cycleway_surface_lanes
+    elif way_type == 'cycle track':
+        return p.default_cycleway_surface_tracks
+    elif way_type == 'track or service':
+        tracktype = feature.attribute('tracktype')
+        return p.default_track_surface_dict.get(tracktype, p.default_track_surface_dict['grade3'])
+    else:
+        highway = feature.attribute('highway')
+        return p.default_highway_surface_dict.get(highway, p.default_highway_surface_dict['path'])
+
+
+def derive_surface(feature):
+    proc_surface = None
+    data_missing = []
+    way_type = feature.attribute('way_type')
+
+    surface_bicycle = feature.attribute('surface:bicycle')
+    if surface_bicycle:
+        if surface_bicycle in p.surface_factor_dict:
+            proc_surface = surface_bicycle
+        elif ';' in surface_bicycle:
+            proc_surface = d.getWeakestSurfaceValue(d.getDelimitedValues(surface_bicycle, ';', 'string'))
+
+    if proc_surface:
+        return proc_surface, data_missing
+
+    if way_type == 'segregated path':
+        proc_surface = feature.attribute('cycleway:surface')
+        if not proc_surface:
+            surface = feature.attribute('surface')
+            if surface:
+                proc_surface = surface
+            else:
+                highway = feature.attribute('highway')
+                proc_surface = p.default_highway_surface_dict.get(highway, p.default_highway_surface_dict.get('path'))
+            data_missing.append('surface')
+    else:
+        proc_surface = feature.attribute('surface')
+        if not proc_surface:
+            proc_surface = get_default_surface(feature, way_type)
+            data_missing.append('surface')
+
+    #if more than one surface value is tagged (delimited by a semicolon), use the weakest one
+    if ';' in proc_surface:
+        proc_surface = d.getWeakestSurfaceValue(d.getDelimitedValues(proc_surface, ';', 'string'))
+    if proc_surface not in p.surface_factor_dict:
+        proc_surface = NULL
+
+    return proc_surface, data_missing
+
+
+def derive_smoothness(feature):
+    # proc_smoothness = feature.attribute('smoothness')
+    #in rare cases, surface or smoothness is explicitely tagged for bicycles - check that first
+    data_missing = []
+    smoothness_bicycle = feature.attribute('smoothness:bicycle')
+    proc_smoothness = p.smoothness_factor_dict.get(smoothness_bicycle, NULL)
+    way_type = feature.attribute('way_type')
+    
+    if not proc_smoothness:
+        if way_type == 'segregated path':
+            proc_smoothness = feature.attribute('cycleway:smoothness') or feature.attribute('smoothness')
+        else:
+            proc_smoothness = feature.attribute('smoothness')
+        
+        if not proc_smoothness:
+            data_missing.append('smoothness')
+
+    if proc_smoothness not in p.smoothness_factor_dict:
+        proc_smoothness = NULL
+
+    return proc_smoothness, data_missing
+
+
 def update_feature_attributes(layer, feature, field_ids):
     data_missing = []
     one_way = derive_oneway_status(feature)
     layer.changeAttributeValue(feature.id(), field_ids.get('proc_oneway'), one_way)
 
-    proc_width, data_missing = calc_feature_width(feature, one_way)
+    proc_width, width_missing = calc_feature_width(feature, one_way)
+    data_missing.extend(width_missing)
     layer.changeAttributeValue(feature.id(), field_ids.get("proc_width"), proc_width)
-    # print(data_missing)
+
+    proc_surface, surface_missing = derive_surface(feature)
+    data_missing.extend(surface_missing)
+    layer.changeAttributeValue(feature.id(), field_ids.get("proc_surface"), proc_surface)
+
+    proc_smoothness, smoothness_missing = derive_smoothness(feature)
+    data_missing.extend(smoothness_missing)
+    layer.changeAttributeValue(feature.id(), field_ids.get("proc_smoothness"), proc_smoothness)
+
+    
     for entry in data_missing:
         layer.changeAttributeValue(feature.id(), field_ids.get(entry), 1)
-
-    return one_way, proc_width # Just returning for testing
+        
+    return one_way, proc_width, proc_surface, proc_smoothness # Just returning for testing
 
 
 
@@ -1087,94 +1173,12 @@ def main():
     # update_way_attributes(layer, field_ids)
     with edit(layer):
         for feature in layer.getFeatures():
-            proc_oneway, proc_width = update_feature_attributes(layer, feature, field_ids)
+            proc_oneway, proc_width, proc_surface, proc_smoothness = update_feature_attributes(layer, feature, field_ids)
 
             way_type = feature.attribute('way_type')
             side = feature.attribute('side')
             is_sidepath = feature.attribute('proc_sidepath')
             data_missing = ''
-
-            #-------------
-            #Derive surface and smoothness.
-            #-------------
-
-            proc_surface = NULL
-            proc_smoothness = NULL
-
-            #in rare cases, surface or smoothness is explicitely tagged for bicycles - check that first
-            surface_bicycle = feature.attribute('surface:bicycle')
-            smoothness_bicycle = feature.attribute('smoothness:bicycle')
-            if surface_bicycle:
-                if surface_bicycle in p.surface_factor_dict:
-                    proc_surface = surface_bicycle
-                elif ';' in surface_bicycle:
-                    proc_surface = d.getWeakestSurfaceValue(d.getDelimitedValues(surface_bicycle, ';', 'string'))
-            if smoothness_bicycle and smoothness_bicycle in p.smoothness_factor_dict:
-                proc_smoothness = smoothness_bicycle
-
-            if not proc_surface:
-                if way_type == 'segregated path':
-                    proc_surface = feature.attribute('cycleway:surface')
-                    if not proc_surface:
-                        surface = feature.attribute('surface')
-                        if surface:
-                            proc_surface = surface
-                        else:
-                            highway = feature.attribute('highway')
-                            if highway in p.default_highway_surface_dict:
-                                proc_surface = p.default_highway_surface_dict[highway]
-                            else:
-                                proc_surface = p.default_highway_surface_dict['path']
-                            data_missing = d.addDelimitedValue(data_missing, 'surface')
-                            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_surface'), 1)
-                    if not proc_smoothness:
-                        proc_smoothness = feature.attribute('cycleway:smoothness')
-                        if not proc_smoothness:
-                            smoothness = feature.attribute('smoothness')
-                            if smoothness:
-                                proc_smoothness = smoothness
-                            else:
-                                data_missing = d.addDelimitedValue(data_missing, 'smoothness')
-                                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_smoothness'), 1)
-
-                else:
-                    #surface and smoothness for cycle lanes and sidewalks have already been derived from original tags when calculating way offsets
-                    proc_surface = feature.attribute('surface')
-                    if not proc_surface:
-                        if way_type in ['cycle lane (advisory)', 'cycle lane (exclusive)', 'cycle lane (protected)', 'cycle lane (central)']:
-                            proc_surface = p.default_cycleway_surface_lanes
-                        elif way_type == 'cycle track':
-                            proc_surface = p.default_cycleway_surface_tracks
-                        elif way_type == 'track or service':
-                            tracktype = feature.attribute('tracktype')
-                            if tracktype in p.default_track_surface_dict:
-                                proc_surface = p.default_track_surface_dict[tracktype]
-                            else:
-                                proc_surface = p.default_track_surface_dict['grade3']
-                        else:
-                            highway = feature.attribute('highway')
-                            if highway in p.default_highway_surface_dict:
-                                proc_surface = p.default_highway_surface_dict[highway]
-                            else:
-                                proc_surface = p.default_highway_surface_dict['path']
-                        data_missing = d.addDelimitedValue(data_missing, 'surface')
-                        layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_surface'), 1)
-                    if not proc_smoothness:
-                        proc_smoothness = feature.attribute('smoothness')
-                        if not proc_smoothness:
-                            data_missing = d.addDelimitedValue(data_missing, 'smoothness')
-                            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_smoothness'), 1)
-
-            #if more than one surface value is tagged (delimited by a semicolon), use the weakest one
-            if ';' in proc_surface:
-                proc_surface = d.getWeakestSurfaceValue(d.getDelimitedValues(proc_surface, ';', 'string'))
-            if proc_surface not in p.surface_factor_dict:
-                proc_surface = NULL
-            if proc_smoothness not in p.smoothness_factor_dict:
-                proc_smoothness = NULL
-            
-            layer.changeAttributeValue(feature.id(), field_ids.get("proc_surface"), proc_surface)
-            layer.changeAttributeValue(feature.id(), field_ids.get("proc_smoothness"), proc_smoothness)
 
             #-------------
             #Derive (physical) separation and buffer.
