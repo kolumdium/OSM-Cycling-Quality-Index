@@ -1205,9 +1205,233 @@ def update_feature_attributes(layer, feature, field_ids):
     for entry in data_missing:
         layer.changeAttributeValue(feature.id(), field_ids.get(entry), 1)
         
-    return one_way, proc_width, proc_surface, proc_smoothness, traffic_mode_left, traffic_mode_right, proc_separation_left, proc_separation_right, proc_physical_buffer_left, proc_physical_buffer_right, proc_mandatory, proc_traffic_sign  # Just returning for testing
+    return one_way, proc_width, proc_surface, proc_smoothness, traffic_mode_left, traffic_mode_right, proc_separation_left, proc_separation_right, proc_physical_buffer_left, proc_physical_buffer_right, proc_mandatory, proc_traffic_sign, data_missing  # Just returning for testing
+
+def get_base_index(way_type, feature, data_bonus):
+    base_index = p.base_index_dict.get(way_type, None)
+    # On roads with restricted motor vehicle access, overwrite the base index with an access-specific base index
+    if way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'track or service']:
+        motor_vehicle_access = d.getAccess(feature, 'motor_vehicle')
+        base_index = p.motor_vehicle_access_index_dict.get(motor_vehicle_access, base_index)
+        if motor_vehicle_access in p.motor_vehicle_access_index_dict:
+            data_bonus.append('motor vehicle restricted')
+    return base_index
+
+def calculate_width(way_type, proc_width, proc_oneway, feature):
+    is_dedicated_for_cycling = way_type not in ['bicycle road', 'shared road', 'shared traffic lane', 'shared bus lane', 'track or service'] or d.getAccess(feature, 'motor_vehicle') == 'no'
+    calc_width = proc_width
+    minimum_factor = 0
+
+    if is_dedicated_for_cycling:
+        if calc_width and 'yes' not in proc_oneway:
+            calc_width /= 1.6
+    else:
+        minimum_factor = 0.25
+        if calc_width:
+            if way_type == 'shared traffic lane':
+                calc_width = max(calc_width - 2 + ((4.5 - calc_width) / 3), 0)
+            elif way_type == 'shared bus lane':
+                calc_width = max(calc_width - 3 + ((5.5 - calc_width) / 3), 0)
+            else:
+                if 'yes' not in proc_oneway:
+                    calc_width /= 1.6
+                calc_width -= 2
+
+    return calc_width, minimum_factor
+
+def calculate_width_factor(calc_width, minimum_factor, way_type, motor_vehicle_access):
+    if calc_width:
+        calc_width = max(0.001, calc_width)
+        if calc_width <= 3 or way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'shared bus lane', 'track or service']:
+            fac_width = 1.1 / (1 + 20 * math.e ** (-2.1 * calc_width))
+        else:
+            fac_width = 2 / (1 + 1.8 * math.e ** (-0.24 * calc_width))
+
+        if way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'track or service'] and motor_vehicle_access in p.motor_vehicle_access_index_dict:
+            fac_width = fac_width + ((1 - fac_width) / 2)
+
+        return round(fac_width, 3)
+    return None
 
 
+def add_width_bonus_or_malus(fac_width, data_bonus, data_malus):
+    if fac_width is None:
+        return
+    if fac_width > 1:
+        data_bonus = data_bonus.append('wide width')
+    if fac_width and fac_width <= 0.5:
+        data_malus = data_malus.append('narrow width')
+
+
+def calculate_surface_factor(proc_smoothness, proc_surface):
+    fac_surface = p.smoothness_factor_dict.get(proc_smoothness, None)
+    if fac_surface is None:
+        fac_surface = p.surface_factor_dict.get(proc_surface, None)
+    return fac_surface
+
+
+def add_surface_bonus_or_malus(fac_surface, data_bonus, data_malus):
+    if fac_surface and fac_surface > 1:
+        data_bonus = data_bonus.append('excellent surface')
+    if fac_surface and fac_surface <= 0.5:
+        data_malus = data_malus.append('bad surface')
+
+def calculate_maxspeed_factor(proc_maxspeed):
+    fac_maxspeed = 1
+    if proc_maxspeed:
+        for maxspeed in sorted(p.maxspeed_factor_dict.keys(), reverse=True):
+            if proc_maxspeed >= maxspeed:
+                fac_maxspeed = p.maxspeed_factor_dict[maxspeed]
+                break
+    return fac_maxspeed
+
+def is_max_speed_missing(way_type, proc_highway, proc_sidepath, proc_maxspeed):
+    if proc_maxspeed is None and way_type != 'track or service' and proc_sidepath != 'no' and proc_highway not in ['pedestrian', 'service', 'track']:
+        return True
+    return False
+
+def calculate_highway_factor(proc_highway):
+    return p.highway_factor_dict.get(proc_highway, 1)
+
+
+def calculate_surface_width_factor(fac_width, fac_surface):
+    if fac_width and fac_surface:
+        weight_factor_width = max(1 - fac_width, 0) + 0.5
+        weight_factor_surface = max(1 - fac_surface, 0) + 0.5
+        fac_1 = (weight_factor_width * fac_width + weight_factor_surface * fac_surface) / (weight_factor_width + weight_factor_surface)
+    elif fac_width:
+        fac_1 = fac_width
+    elif fac_surface:
+        fac_1 = fac_surface
+    else:
+        fac_1 = 1
+    return round(fac_1, 2)
+
+
+def calculate_highway_and_maxspeed_factor(way_type, fac_highway, fac_maxspeed, is_sidepath):
+    weight = p.highway_factor_dict_weights.get(way_type, 1)
+    if way_type in ['shared path', 'segregated path', 'shared footway'] and is_sidepath != 'yes':
+        weight = 0
+    fac_2 = fac_highway * fac_maxspeed
+    fac_2 = fac_2 + ((1 - fac_2) * (1 - weight))
+    if not fac_2:
+        fac_2 = 1
+    return round(fac_2, 2), weight
+
+
+def apply_shared_lane_markings_bonus(way_type, fac_4, cycleway, cycleway_both, cycleway_left, cycleway_right, data_bonus):
+    #bonus for sharrows/cycleway=shared lane markings
+    if way_type in ['shared road', 'shared traffic lane']:
+        if cycleway == 'shared_lane' or cycleway_both == 'shared_lane' or cycleway_left == 'shared_lane' or cycleway_right == 'shared_lane':
+            fac_4 += 0.1
+            data_bonus.append('shared lane markings')
+    return fac_4
+
+def apply_surface_color_bonus(way_type, fac_4, feature, is_sidepath, data_bonus):
+    #bonus for surface colour on shared traffic ways
+    if 'cycle lane' in way_type or way_type in ['crossing', 'shared bus lane', 'link', 'bicycle road'] or (way_type in ['shared path', 'segregated path'] and is_sidepath == 'yes'):
+        surface_colour = feature.attribute('surface:colour')
+        if surface_colour and surface_colour not in ['no', 'none', 'grey', 'gray', 'black']:
+            if way_type == 'crossing':
+                fac_4 += 0.15 #more bonus for coloured crossings
+            else:
+                fac_4 += 0.05
+            data_bonus.append('surface colour')
+    return fac_4
+
+def apply_marked_crossing_bonus(way_type, fac_4, feature, data_bonus, data_missing):
+    #bonus for marked or signalled crossings
+    if way_type == 'crossing':
+        crossing = feature.attribute('crossing')
+        if not crossing:
+            data_missing.append('crossing')
+        crossing_markings = feature.attribute('crossing:markings')
+        if not crossing_markings:
+            data_missing.append('crossing_markings')
+        if crossing in ['traffic_signals']:
+            fac_4 += 0.2
+            data_bonus.append('signalled crossing')
+        elif crossing in ['marked', 'zebra'] or (crossing_markings and crossing_markings != 'no'):
+            fac_4 += 0.1
+            data_bonus.append('marked crossing')
+    return fac_4
+
+def apply_missing_streetlight_malus(fac_4, feature, data_malus, data_missing):
+    #malus for missing street light
+    lit = feature.attribute('lit')
+    if not lit:
+        data_missing.append('lit')
+    if lit == 'no':
+        fac_4 -= 0.1
+        data_malus.append('no street lighting')
+    return fac_4
+
+def apply_no_parking_buffer_malus(way_type, fac_4, traffic_mode_left, buffer_left, traffic_mode_right, buffer_right, is_sidepath, data_malus):
+    #malus for cycle way along parking without buffer (danger of dooring)
+    #TODO: currently no information if parking is parallel parking - for this, a parking orientation lookup on the centerline is needed for separately mapped cycle ways
+    if ((traffic_mode_left == 'parking' and buffer_left and buffer_left < 1) or (traffic_mode_right == 'parking' and buffer_right and buffer_right < 1)) and ('cycle lane' in way_type or (way_type in ['cycle track', 'shared path', 'segregated path'] and is_sidepath == 'yes')):
+        #malus is 0 (buffer = 1m) .. 0.2 (buffer = 0m)
+        diff = 0
+        if traffic_mode_left == 'parking':
+            diff = abs(buffer_left - 1) / 5
+        if traffic_mode_right == 'parking':
+            diff = abs(buffer_right - 1) / 5
+        if traffic_mode_left == 'parking' and traffic_mode_right == 'parking':
+            diff = abs(((buffer_left + buffer_right) / 2) - 1) / 5
+        fac_4 -= diff
+        data_malus.append(data_malus, 'insufficient dooring buffer')
+        
+    return fac_4
+
+def apply_permissive_bicycle_malus(bicycle, fac_4, data_malus):
+    #malus if bicycle is only "permissive"
+    if bicycle == 'permissive':
+        fac_4 -= 0.2
+        data_malus.append(data_malus, 'cycling not intended')
+    return fac_4
+
+def calculate_level_of_traffic_stress(way_type, proc_oneway, proc_width, proc_maxspeed, proc_highway, feature):
+    lts = NULL
+    if way_type in ['cycle path', 'cycle track', 'segregated path', 'cycle lane (protected)']:
+        lts = 1
+    elif way_type in ['shared path', 'shared footway']:
+        if not proc_oneway in ['yes', '-1'] and proc_width and proc_width < 3 and proc_maxspeed and proc_maxspeed > 30:
+            lts = 3
+        else:
+            lts = 1
+    elif way_type in ['cycle lane (advisory)', 'cycle lane (central)', 'shared bus lane', 'link', 'crossing']:
+        if proc_maxspeed and proc_maxspeed <= 10:
+            lts = 1
+        elif proc_maxspeed and proc_maxspeed <= 30:
+            lts = 2
+        elif proc_width and proc_width >= 1.5:
+            lts = 3
+        else:
+            lts = 4
+    elif way_type == 'cycle lane (exclusive)':
+        if proc_maxspeed and proc_maxspeed <= 10:
+            lts = 1
+        elif proc_maxspeed and proc_maxspeed <= 50 and proc_width and proc_width >= 1.85:
+            lts = 2
+        else:
+            lts = 3
+    elif way_type in ['bicycle road', 'shared road', 'shared traffic lane']:
+        if way_type == 'bicycle road' and d.getAccess(feature, 'motor_vehicle') in p.motor_vehicle_access_index_dict:
+            lts = 1
+        else:
+            priority_road = feature.attribute('priority_road')
+            if proc_maxspeed and proc_maxspeed <= 10 and proc_highway in ['residential', 'living_street'] and (not priority_road or priority_road == 'no'):
+                lts = 1
+            elif proc_maxspeed and proc_maxspeed <= 30 and proc_highway in ['tertiary', 'tertiary_link', 'unclassified', 'road', 'residential', 'living_street']:
+                lts = 2
+            else:
+                lts = 4
+    elif way_type == 'track or service':
+        if proc_maxspeed and proc_maxspeed <= 10:
+            lts = 1
+        else:
+            lts = 2
+    return lts
 
 print_timestamped_message('Start processing:')
 print_timestamped_message('Read data...')
@@ -1384,12 +1608,11 @@ def main():
     # update_way_attributes(layer, field_ids)
     with edit(layer):
         for feature in layer.getFeatures():
-            proc_oneway, proc_width, proc_surface, proc_smoothness, traffic_mode_left, traffic_mode_right, proc_separation_left, proc_separation_right, buffer_left, buffer_right, proc_mandatory, proc_traffic_sign = update_feature_attributes(layer, feature, field_ids)
+            proc_oneway, proc_width, proc_surface, proc_smoothness, traffic_mode_left, traffic_mode_right, proc_separation_left, proc_separation_right, buffer_left, buffer_right, proc_mandatory, proc_traffic_sign, data_missing = update_feature_attributes(layer, feature, field_ids)
 
             way_type = feature.attribute('way_type')
             side = feature.attribute('side')
             is_sidepath = feature.attribute('proc_sidepath')
-            data_missing = ''
             cycleway = feature.attribute('cycleway')
             cycleway_both = feature.attribute('cycleway:both')
             cycleway_left = feature.attribute('cycleway:left')
@@ -1402,111 +1625,44 @@ def main():
             #-------------------------------#
 
             #human readable strings for significant good or bad factors
-            data_bonus = ''
-            data_malus = ''
+            data_bonus = []
+            data_malus = []
             #------------------------------------
             #Set base index according to way type
             #------------------------------------
-            if way_type in p.base_index_dict:
-                base_index = p.base_index_dict[way_type]
-            else:
-                base_index = NULL
-            #on roads with restricted motor vehicle access, overwrite the base index with a access-specific base index
-            if way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'track or service']:
-                motor_vehicle_access = d.getAccess(feature, 'motor_vehicle')
-                if motor_vehicle_access in p.motor_vehicle_access_index_dict:
-                    base_index = p.motor_vehicle_access_index_dict[motor_vehicle_access]
-                    data_bonus = d.addDelimitedValue(data_bonus, 'motor vehicle restricted')
+            base_index = get_base_index(way_type, feature, data_bonus)
             layer.changeAttributeValue(feature.id(), field_ids.get('base_index'), base_index)
 
             #--------------------------------------------
             #Calculate width factor according to way type
             #--------------------------------------------
-            calc_width = NULL
-            minimum_factor = 0
-            #for dedicated ways for cycling
-            if way_type not in ['bicycle road', 'shared road', 'shared traffic lane', 'shared bus lane', 'track or service'] or d.getAccess(feature, 'motor_vehicle') == 'no':
-                calc_width = proc_width
-                #calculated width depends on the width/space per driving direction
-                if calc_width and not 'yes' in proc_oneway:
-                    calc_width /= 1.6
-
-            #for shared roads and lanes
-            else:
-                calc_width = proc_width
-                minimum_factor = 0.25 #on shared roads, there is a minimum width factor, because in case of doubt, other vehicles have to pass careful or can't overtake
-                if calc_width:
-                    if way_type == 'shared traffic lane':
-                        calc_width = max(calc_width - 2 + ((4.5 - calc_width) / 3), 0)
-                    elif way_type == 'shared bus lane':
-                        calc_width = max(calc_width - 3 + ((5.5 - calc_width) / 3), 0)
-                    else:
-                        if not 'yes' in proc_oneway:
-                            calc_width /= 1.6
-                        #TODO: Use a global 'optimum road width' variable for this?
-                        calc_width -= 2 #on motor vehicle roads, optimum width is 2m for a car + 1m for bicycle + 1.5m safety distance -> exactly 2m more than the optimum width on cycleways. Simply subtract 2m from the processed width to get a comparable width value that can be used with the following width factor formula
-
-            #Calculate width factor (logistic regression)
-            if calc_width:
-                #factor should not be negative and not 0, since the following logistic regression isn't working for 0
-                calc_width = max(0.001, calc_width)
-                #regular formula
-                if calc_width <= 3 or way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'shared bus lane', 'track or service']:
-                    fac_width = 1.1 / (1 + 20 * math.e ** (-2.1 * calc_width))
-                #formula for extra wide ways (not used for shared roads and lanes)
-                else:
-                    fac_width = 2 / (1 + 1.8 * math.e ** (-0.24 * calc_width))
-
-                #on roads with restricted motor vehicle access, the width factor has a lower weight, because it can be assumed that there is less traffic that shares the road width
-                if way_type in ['bicycle road', 'shared road', 'shared traffic lane', 'track or service'] and motor_vehicle_access in p.motor_vehicle_access_index_dict:
-                    fac_width = fac_width + ((1 - fac_width) / 2)
-
-                fac_width = round(max(minimum_factor, fac_width), 3)
-            else:
-                fac_width = NULL
-
-            layer.changeAttributeValue(feature.id(), field_ids.get('fac_width'), fac_width)
-
-            if fac_width > 1:
-                data_bonus = d.addDelimitedValue(data_bonus, 'wide width')
-            if fac_width and fac_width <= 0.5:
-                data_malus = d.addDelimitedValue(data_malus, 'narrow width')
+            calc_width, minimum_factor = calculate_width(way_type, proc_width, proc_oneway, feature)
+            fac_width = calculate_width_factor(calc_width, minimum_factor, way_type, d.getAccess(feature, 'motor_vehicle'))
+            add_width_bonus_or_malus(fac_width, data_bonus, data_malus)
 
             #---------------------------------------
             #Calculate surface and smoothness factor
             #---------------------------------------
-            if proc_smoothness and proc_smoothness in p.smoothness_factor_dict:
-                fac_surface = p.smoothness_factor_dict[proc_smoothness]
-            elif proc_surface and proc_surface in p.surface_factor_dict:
-                fac_surface = p.surface_factor_dict[proc_surface]
-
+            fac_surface = calculate_surface_factor(proc_smoothness, proc_surface)
             layer.changeAttributeValue(feature.id(), field_ids.get('fac_surface'), fac_surface)
-
-            if fac_surface > 1:
-                data_bonus = d.addDelimitedValue(data_bonus, 'excellent surface')
-            if fac_surface and fac_surface <= 0.5:
-                data_malus = d.addDelimitedValue(data_malus, 'bad surface')
+            add_surface_bonus_or_malus(fac_surface, data_bonus, data_malus)
 
             #------------------------------------------------
             #Calculate highway (sidepath) and maxspeed factor
             #------------------------------------------------
             proc_highway = feature.attribute('proc_highway')
             proc_maxspeed = feature.attribute('proc_maxspeed')
-            fac_highway = 1
-            fac_maxspeed = 1
-            if proc_highway and proc_highway in p.highway_factor_dict:
-                fac_highway = p.highway_factor_dict[proc_highway]
-            if proc_maxspeed:
-                for maxspeed in p.maxspeed_factor_dict.keys():
-                    if proc_maxspeed >= maxspeed:
-                        fac_maxspeed = p.maxspeed_factor_dict[maxspeed]
-            #mark maxspeed value as missing, if the way segment is a sidepath or independent road (except for service, track or pedestrian segments where maxspeed isn't necessary)
-            elif way_type != 'track or service' and feature.attribute('proc_sidepath') != 'no' and proc_highway not in ['pedestrian', 'service', 'track']:
-                data_missing = d.addDelimitedValue(data_missing, 'maxspeed')
-                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_maxspeed'), 1)
+            proc_sidepath = feature.attribute('proc_sidepath')
+
+            fac_highway = calculate_highway_factor(proc_highway)
+            fac_maxspeed = calculate_maxspeed_factor(proc_maxspeed)
 
             layer.changeAttributeValue(feature.id(), field_ids.get('fac_highway'), fac_highway)
             layer.changeAttributeValue(feature.id(), field_ids.get('fac_maxspeed'), fac_maxspeed)
+
+            if is_max_speed_missing(way_type, proc_highway, proc_sidepath, proc_maxspeed):
+                data_missing.append('maxspeed')
+                layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_maxspeed'), 1)
 
 #            #-------------------------------------------------
 #            #Calculate (physical) separation and buffer factor
@@ -1578,42 +1734,20 @@ def main():
             index = NULL
             index_10 = NULL
             if base_index != NULL:
-                #factor 1: width and surface
-                #width and surface factors are weighted, so that low values have a stronger influence on the index
-                if fac_width and fac_surface:
-                    #fac_1 = (fac_width + fac_surface) / 2 #formula without weight factors
-                    weight_factor_width = max(1 - fac_width, 0) + 0.5 #max(1-x, 0) makes that only values below 1 are resulting in a stronger decrease of the index
-                    weight_factor_surface = max(1 - fac_surface, 0) + 0.5
-                    fac_1 = (weight_factor_width * fac_width + weight_factor_surface * fac_surface) / (weight_factor_width + weight_factor_surface)
-                elif fac_width:
-                    fac_1 = fac_width
-                elif fac_surface:
-                    fac_1 = fac_surface
-                else:
-                    fac_1 = 1
+                
+                fac_1 = calculate_surface_width_factor(fac_width, fac_surface)
                 layer.changeAttributeValue(feature.id(), field_ids.get('fac_1'), round(fac_1, 2))
 
-                #factor 2: highway and maxspeed
-                #highway factor is weighted according to how close the bicycle traffic is to the motor traffic
-                weight = 1
-                if way_type in p.highway_factor_dict_weights:
-                    weight = p.highway_factor_dict_weights[way_type]
-                #if a shared path isn't a sidepath of a road, highway factor remains 1 (has no influence on the index)
-                if way_type in ['shared path', 'segregated path', 'shared footway'] and is_sidepath != 'yes':
-                    weight = 0
-                fac_2 = fac_highway * fac_maxspeed #maxspeed and highway factor are combined in one highway factor
-                fac_2 = fac_2 + ((1 - fac_2) * (1 - weight)) #factor is weighted (see above) - low weights lead to a factor closer to 1
-                if not fac_2:
-                   fac_2 = 1
+                fac_2, weight = calculate_highway_and_maxspeed_factor(way_type, fac_highway, fac_maxspeed, is_sidepath)
                 layer.changeAttributeValue(feature.id(), field_ids.get('fac_2'), round(fac_2, 2))
 
                 if weight >= 0.5:
                     if fac_2 > 1:
-                        data_bonus = d.addDelimitedValue(data_bonus, 'slow traffic')
+                        data_bonus.append('slow traffic')
                     if fac_highway <= 0.7:
-                        data_malus = d.addDelimitedValue(data_malus, 'along a major road')
+                        data_malus.append('along a major road')
                     if fac_maxspeed <= 0.7:
-                        data_malus = d.addDelimitedValue(data_malus, 'along a road with high speed limits')
+                        data_malus.append('along a road with high speed limits')
 
                 #factor 3: separation and buffer
                 fac_3 = 1
@@ -1621,65 +1755,16 @@ def main():
 
                 #factor group 4: miscellaneous attributes can result in an other bonus or malus
                 fac_4 = 1
+                fac_4 = apply_shared_lane_markings_bonus(way_type, fac_4, cycleway, cycleway_both, cycleway_left, cycleway_right, data_bonus)
+                fac_4 = apply_surface_color_bonus(way_type, fac_4, feature, is_sidepath, data_bonus)
+                fac_4 = apply_marked_crossing_bonus(way_type, fac_4, feature, data_bonus, data_missing)
+                fac_4 = apply_missing_streetlight_malus(fac_4, feature, data_malus, data_missing)
+                fac_4 = apply_no_parking_buffer_malus(way_type, fac_4, traffic_mode_left, buffer_left, traffic_mode_right, buffer_right, is_sidepath, data_malus)
+                fac_4 = apply_permissive_bicycle_malus(bicycle, fac_4, data_malus)
 
-                #bonus for sharrows/cycleway=shared lane markings
-                if way_type in ['shared road', 'shared traffic lane']:
-                    if cycleway == 'shared_lane' or cycleway_both == 'shared_lane' or cycleway_left == 'shared_lane' or cycleway_right == 'shared_lane':
-                        fac_4 += 0.1
-                        data_bonus = d.addDelimitedValue(data_bonus, 'shared lane markings')
 
-                #bonus for surface colour on shared traffic ways
-                if 'cycle lane' in way_type or way_type in ['crossing', 'shared bus lane', 'link', 'bicycle road'] or (way_type in ['shared path', 'segregated path'] and is_sidepath == 'yes'):
-                    surface_colour = feature.attribute('surface:colour')
-                    if surface_colour and surface_colour not in ['no', 'none', 'grey', 'gray', 'black']:
-                        if way_type == 'crossing':
-                            fac_4 += 0.15 #more bonus for coloured crossings
-                        else:
-                            fac_4 += 0.05
-                        data_bonus = d.addDelimitedValue(data_bonus, 'surface colour')
-
-                #bonus for marked or signalled crossings
-                if way_type == 'crossing':
-                    crossing = feature.attribute('crossing')
-                    if not crossing:
-                        data_missing = d.addDelimitedValue(data_missing, 'crossing')
-                    crossing_markings = feature.attribute('crossing:markings')
-                    if not crossing_markings:
-                        data_missing = d.addDelimitedValue(data_missing, 'crossing_markings')
-                    if crossing in ['traffic_signals']:
-                        fac_4 += 0.2
-                        data_bonus = d.addDelimitedValue(data_bonus, 'signalled crossing')
-                    elif crossing in ['marked', 'zebra'] or (crossing_markings and crossing_markings != 'no'):
-                        fac_4 += 0.1
-                        data_bonus = d.addDelimitedValue(data_bonus, 'marked crossing')
-
-                #malus for missing street light
-                lit = feature.attribute('lit')
-                if not lit:
-                    data_missing = d.addDelimitedValue(data_missing, 'lit')
+                if "lit" in data_missing:
                     layer.changeAttributeValue(feature.id(), field_ids.get('data_missing_lit'), 1)
-                if lit == 'no':
-                    fac_4 -= 0.1
-                    data_malus = d.addDelimitedValue(data_malus, 'no street lighting')
-
-                #malus for cycle way along parking without buffer (danger of dooring)
-                #TODO: currently no information if parking is parallel parking - for this, a parking orientation lookup on the centerline is needed for separately mapped cycle ways
-                if ((traffic_mode_left == 'parking' and buffer_left and buffer_left < 1) or (traffic_mode_right == 'parking' and buffer_right and buffer_right < 1)) and ('cycle lane' in way_type or (way_type in ['cycle track', 'shared path', 'segregated path'] and is_sidepath == 'yes')):
-                    #malus is 0 (buffer = 1m) .. 0.2 (buffer = 0m)
-                    diff = 0
-                    if traffic_mode_left == 'parking':
-                        diff = abs(buffer_left - 1) / 5
-                    if traffic_mode_right == 'parking':
-                        diff = abs(buffer_right - 1) / 5
-                    if traffic_mode_left == 'parking' and traffic_mode_right == 'parking':
-                        diff = abs(((buffer_left + buffer_right) / 2) - 1) / 5
-                    fac_4 -= diff
-                    data_malus = d.addDelimitedValue(data_malus, 'insufficient dooring buffer')
-
-                #malus if bicycle is only "permissive"
-                if bicycle == 'permissive':
-                    fac_4 -= 0.2
-                    data_malus = d.addDelimitedValue(data_malus, 'cycling not intended')
 
                 layer.changeAttributeValue(feature.id(), field_ids.get('fac_4'), round(fac_4, 2))
 
@@ -1692,67 +1777,22 @@ def main():
 
             layer.changeAttributeValue(feature.id(), field_ids.get('index'), index)
             layer.changeAttributeValue(feature.id(), field_ids.get('index_10'), index_10)
-            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing'), data_missing)
-            layer.changeAttributeValue(feature.id(), field_ids.get('data_bonus'), data_bonus)
-            layer.changeAttributeValue(feature.id(), field_ids.get('data_malus'), data_malus)
-
-
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_missing'), ';'.join(data_missing))
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_bonus'), ";".join(data_bonus))
+            layer.changeAttributeValue(feature.id(), field_ids.get('data_malus'), ";".join(data_malus))
 
             #---------------
             #Calculate levels of traffic stress
             #---------------
-            lts = NULL
-            if way_type in ['cycle path', 'cycle track', 'segregated path', 'cycle lane (protected)']:
-                lts = 1
-            elif way_type in ['shared path', 'shared footway']:
-                if not proc_oneway in ['yes', '-1'] and proc_width and proc_width < 3 and proc_maxspeed and proc_maxspeed > 30:
-                    lts = 3
-                else:
-                    lts = 1
-            elif way_type in ['cycle lane (advisory)', 'cycle lane (central)', 'shared bus lane', 'link', 'crossing']:
-                if proc_maxspeed and proc_maxspeed <= 10:
-                    lts = 1
-                elif proc_maxspeed and proc_maxspeed <= 30:
-                    lts = 2
-                elif proc_width and proc_width >= 1.5:
-                    lts = 3
-                else:
-                    lts = 4
-            elif way_type == 'cycle lane (exclusive)':
-                if proc_maxspeed and proc_maxspeed <= 10:
-                    lts = 1
-                elif proc_maxspeed and proc_maxspeed <= 50 and proc_width and proc_width >= 1.85:
-                    lts = 2
-                else:
-                    lts = 3
-            elif way_type in ['bicycle road', 'shared road', 'shared traffic lane']:
-                if way_type == 'bicycle road' and d.getAccess(feature, 'motor_vehicle') in p.motor_vehicle_access_index_dict:
-                    lts = 1
-                else:
-                    priority_road = feature.attribute('priority_road')
-                    if proc_maxspeed and proc_maxspeed <= 10 and proc_highway in ['residential', 'living_street'] and (not priority_road or priority_road == 'no'):
-                        lts = 1
-                    elif proc_maxspeed and proc_maxspeed <= 30 and proc_highway in ['tertiary', 'tertiary_link', 'unclassified', 'road', 'residential', 'living_street']:
-                        lts = 2
-                    else:
-                        lts = 4
-            elif way_type == 'track or service':
-                if proc_maxspeed and proc_maxspeed <= 10:
-                    lts = 1
-                else:
-                    lts = 2
+            lts = calculate_level_of_traffic_stress(way_type, proc_oneway, proc_width, proc_maxspeed, proc_highway, feature)
             layer.changeAttributeValue(feature.id(), field_ids.get('stress_level'), lts)
-
-
 
             #---------------
             #derive a data completeness number
             #---------------
             data_incompleteness = 0
-            missing_values = d.getDelimitedValues(data_missing, ';', 'string')
-            for value in missing_values:
-                if value in p.data_incompleteness_dict:
-                    data_incompleteness += p.data_incompleteness_dict[value]
+            for missing_data in data_missing:
+                data_incompleteness += p.data_incompleteness_dict.get(missing_data, 0)
             layer.changeAttributeValue(feature.id(), field_ids.get('data_incompleteness'), data_incompleteness)
 
         layer.updateFields()
