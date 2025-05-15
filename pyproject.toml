@@ -1,0 +1,13 @@
+[project]
+name = "osm-cycling-quality-index"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "loguru>=0.7.3",
+    "pretty-errors>=1.2.25",
+    "pydantic>=2.11.4",
+    "rich>=14.0.0",
+    "richuru>=0.1.1",
+]

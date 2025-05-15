@@ -15,8 +15,8 @@ from qgis.core import NULL
 #project directory
 from console.console import _console
 project_dir = os.path.dirname(_console.console.tabEditorWidget.currentWidget().path) + '/'
-place_name = "Irxleben, Germany"
-dir_input = project_dir + 'data/' + place_name
+place_name = "test_ways"
+dir_input = project_dir + 'data/test_ways/' + place_name
 dir_output = project_dir + 'data/cycling_quality_index' + '-' + place_name
 file_format = '.geojson'
 multi_input = False #if "True", it's possible to merge different import files stored in the input directory, marked with an ascending number starting with 1 at the end of the filename (e.g. way_import1.geojson, way_import2.geojson etc.) - can be used to process different areas at the same time or to process a larger area that can't be downloaded in one file

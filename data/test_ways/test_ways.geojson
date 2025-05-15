@@ -1,0 +1,1230 @@
+{
+    "type": "FeatureCollection",
+    "name": "cqi_test_data_expanded_v2",
+    "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4326" } },
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw01_yes",
+          "highway": "footway",
+          "bicycle": "yes",
+          "name": "Footway Yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0500], [13.5001, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw02_optional",
+          "highway": "footway",
+          "bicycle": "optional_sidepath",
+          "name": "Footway Optional Sidepath"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0505], [13.5001, 51.0505] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw03_discouraged",
+          "highway": "footway",
+          "bicycle": "discouraged",
+          "name": "Footway Discouraged"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0510], [13.5001, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw04_no",
+          "highway": "footway",
+          "bicycle": "no",
+          "name": "Footway No"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0515], [13.5001, 51.0515] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw05_usesidepath",
+          "highway": "footway",
+          "bicycle": "use_sidepath",
+          "name": "Footway Use Sidepath"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0520], [13.5001, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "fw06_null",
+          "highway": "footway",
+          "name": "Footway Bicycle Null"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0525], [13.5001, 51.0525] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl01_centerline",
+          "highway": "primary",
+          "name": "Main Street with Cycleways",
+          "cycleway:left": "track", "cycleway:left:surface": "asphalt", "cycleway:left:width": "2.0", "cycleway:left:oneway": "no", "cycleway:left:lit": "yes",
+          "cycleway:right": "lane", "cycleway:right:lane": "exclusive", "cycleway:right:surface": "concrete", "cycleway:right:width": "1.5", "cycleway:right:oneway": "yes", "cycleway:right:buffer:left": "0.5",
+          "width": "12", "oneway": "no", "maxspeed": "50", "lanes": "2", "lit":"yes",
+          "comment": "Offset creation: left track, right exclusive lane with buffer."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0500], [13.5015, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl02_centerline_both_lane",
+          "highway": "secondary",
+          "name": "Road with Cycleway:both=lane",
+          "cycleway:both": "lane", "cycleway:both:width": "1.6", "cycleway:both:surface": "asphalt", "cycleway:both:oneway": "no", "cycleway:both:surface:colour": "red",
+          "width": "10", "oneway": "no", "maxspeed": "50", "lanes": "2",
+          "comment": "Offset creation: cycleway:both=lane."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0510], [13.5015, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr01_no_parking_width",
+          "highway": "residential",
+          "name": "Shared Rd No Parking, Width 7m",
+          "width": "7", "oneway": "no", "maxspeed": "30", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0500], [13.5025, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr02_parking_both",
+          "highway": "residential",
+          "name": "Shared Rd Parking Both, Width 10m",
+          "width": "10", "oneway": "no", "maxspeed": "30", "surface":"asphalt",
+          "parking:both": "lane", "parking:both:orientation": "parallel"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0505], [13.5025, 51.0505] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr03_default_width_no_parking",
+          "highway": "residential",
+          "name": "Shared Rd Default Width, No Parking Tag",
+          "oneway": "no", "maxspeed": "30"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0510], [13.5025, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf01_good_surface",
+          "highway": "cycleway",
+          "name": "Good Surface Cycleway",
+          "surface": "asphalt", "smoothness": "excellent", "width": "2.5", "oneway": "yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0500], [13.5035, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf02_weakest_surface",
+          "highway": "path",
+          "name": "Path Weakest Surface",
+          "surface": "cobblestone;sand", "width": "2", "oneway": "no", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0505], [13.5035, 51.0505] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf03_missing_surface",
+          "highway": "residential",
+          "name": "Residential Missing Surface/Smoothness",
+          "width": "8", "oneway": "no", "maxspeed": "30"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0510], [13.5035, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx01_good_path",
+          "highway": "cycleway",
+          "name": "Index Test Good Path",
+          "surface": "asphalt", "smoothness": "excellent", "width": "3",
+          "oneway": "yes", "lit": "yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0500], [13.5045, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx02_bad_road",
+          "highway": "primary",
+          "name": "Index Test Bad Road",
+          "surface": "cobblestone", "width": "5",
+          "maxspeed": "70", "lit": "no", "oneway": "no", "lanes":"2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0505], [13.5045, 51.0505] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "path01_segregated",
+          "highway": "path",
+          "name": "Segregated Path",
+          "segregated": "yes", "surface": "asphalt", "width": "3", "foot": "yes", "bicycle":"designated"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0530], [13.5001, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "path02_shared_foot_designated",
+          "highway": "path",
+          "name": "Path Foot Designated",
+          "foot": "designated", "bicycle": "yes", "surface": "compacted", "width": "2.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0535], [13.5001, 51.0535] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidepath_check01",
+          "highway": "footway", "name": "Potential Sidepath", "width": "1.5", "surface": "paving_stones", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0502], [13.5055, 51.0502] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "mainroad_for_sidepath01",
+          "highway": "secondary", "name": "Road Alongside Sidepath", "maxspeed": "50", "width": "8"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0500], [13.5055, 51.0500] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "bicycle_road01",
+          "highway": "residential", "name": "Bicycle Road Example", "bicycle_road": "yes", "maxspeed": "30", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0540], [13.5001, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing01",
+          "highway": "footway", "name": "Simple Crossing", "footway": "crossing", "bicycle": "yes", "crossing":"unmarked"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0545], [13.5001, 51.0545] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "track01_grade3",
+          "highway": "track", "tracktype": "grade3", "name": "Farm Track Grade 3", "motor_vehicle": "agricultural", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0550], [13.5001, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "service01_parking_aisle",
+          "highway": "service", "service": "parking_aisle", "name": "Parking Lot Aisle", "maxspeed": "10", "surface": "asphalt", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0555], [13.5001, 51.0555] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "living_street01",
+          "highway": "living_street", "name": "Living Street Zone", "surface": "sett", "maxspeed": "walk", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0560], [13.5001, 51.0560] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "pedestrian01_bicycle_designated",
+          "highway": "pedestrian", "name": "Pedestrian Zone, Bikes Designated", "bicycle": "designated", "foot": "designated", "surface":"paving_stones"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0565], [13.5001, 51.0565] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl03_centerline_oneway_cycle_right",
+          "highway": "tertiary", "name": "Oneway Street, Cycle Right", "oneway": "yes", "maxspeed": "30",
+          "cycleway:right": "lane", "cycleway:right:width": "1.2", "width": "6", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0520], [13.5015, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl04_centerline_conflicting_tags",
+          "highway": "secondary", "name": "Conflicting Cycle Tags", "oneway": "no", "maxspeed": "50",
+          "cycleway:left": "track", "cycleway:left:lane": "advisory", "cycleway:left:width": "1.8", "width": "10",
+          "random_tag": "some_value", "source": "survey", "note:cycling": "Popular route despite tags"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0530], [13.5015, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "widthlanes01",
+          "highway": "primary", "name": "Width Lanes Forward/Backward", "oneway": "no", "maxspeed": "60",
+          "lanes": "4", "width:lanes:forward": "3.5|3.0", "width:lanes:backward": "3.0|3.5", "width": "13",
+          "cycleway:right": "shared_busway", "bus:lanes:forward": "no|yes", "psv:lanes:forward": "no|yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0520], [13.5025, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "separation_buffer01",
+          "highway": "primary", "name": "Separation and Buffer Test", "oneway": "no", "maxspeed": "50",
+          "cycleway:left": "track", "cycleway:left:width": "2.2",
+          "cycleway:left:separation": "kerb;flex_post", "cycleway:left:buffer": "0.5",
+          "width": "11", "note": "Check fac_3 if implemented", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0540], [13.5015, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "traffic_sign01",
+          "highway": "cycleway", "name": "Mandatory Cycleway Sign", "width": "2.0", "surface": "asphalt",
+          "traffic_sign": "DE:240", "oneway": "yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0520], [13.5035, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "missing_highway01",
+          "name": "Unknown Way Type", "surface": "ground", "width": "1.0", "bicycle":"yes",
+          "construction": "road", "FIXME": "highway tag missing", "abandoned:highway": "residential"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0510], [13.5045, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "unusual_values01",
+          "highway": "path", "name": "Path with Odd Tags", "surface": "cheese", "smoothness": "bumpy_like_a_badger",
+          "maxspeed": "fast_as_wind", "width": "narrowish", "bicycle": "maybe", "dog": "leashed"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0515], [13.5045, 51.0515] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidewalk_bicycle01",
+          "highway": "residential", "name": "Road with Sidewalk Bicycle Yes", "maxspeed": "30", "width": "9", "surface":"asphalt",
+          "sidewalk:both:bicycle": "yes", "sidewalk:both:width": "1.5", "sidewalk:both:surface": "concrete"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0530], [13.5025, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "priority_road01",
+          "highway": "residential", "name": "Residential Priority Road", "maxspeed": "30", "priority_road": "yes_unposted", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0570], [13.5001, 51.0570] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "informal_path01",
+          "highway": "path", "name": "Informal Path No Bicycle Tag", "informal": "yes", "surface": "earth"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0575], [13.5001, 51.0575] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surface_colour01",
+          "highway": "cycleway", "name": "Red Cycleway", "surface": "asphalt", "surface:colour": "red", "width": "2", "oneway":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0530], [13.5035, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "layer_test01_path",
+          "highway": "path", "name": "Path on Layer Minus 1", "layer": "-1", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0512], [13.5055, 51.0512] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "layer_test02_road",
+          "highway": "residential", "name": "Road on Layer 0", "layer": "0", "maxspeed":"30", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0510], [13.5055, 51.0510] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "motor_vehicle_destination",
+          "highway": "service", "name": "Service Road - Destination Access", "motor_vehicle": "destination", "surface":"concrete", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0580], [13.5001, 51.0580] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "oneway_bicycle_no_main_oneway",
+          "highway": "residential", "name": "Oneway:bicycle=no, Oneway=yes", "oneway": "yes", "oneway:bicycle":"no", "maxspeed":"30", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0540], [13.5025, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cycleway_lane_central_test",
+          "highway": "tertiary", "name": "Central Cycle Lane Test", "maxspeed": "30", "width":"7", "surface":"asphalt",
+          "cycleway:lanes": "no|lane|no", "cycleway:surface:colour": "red"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0550], [13.5015, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "steps01_bicycle_yes",
+          "highway": "steps", "name": "Steps with Bicycle Access", "bicycle": "yes", "incline": "15%", "step_count": "20"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0585], [13.5001, 51.0585] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "bridleway01_bicycle_permissive",
+          "highway": "bridleway", "name": "Bridleway, Bikes Permissive", "bicycle": "permissive", "horse": "designated", "surface": "ground"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0590], [13.5001, 51.0590] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl05_shared_busway_offset",
+          "highway": "tertiary", "name": "Road with Shared Busway Right", "oneway": "no", "maxspeed": "40", "width": "9",
+          "cycleway:right": "share_busway", "cycleway:right:width": "3.0", "bus:lanes:forward": "no|yes", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0560], [13.5015, 51.0560] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl06_protected_lane_offset",
+          "highway": "secondary", "name": "Road with Protected Lane Left", "oneway": "no", "maxspeed": "50", "width": "10",
+          "cycleway:left": "lane", "cycleway:left:separation": "bollard", "cycleway:left:width": "1.7", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0570], [13.5015, 51.0570] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr04_maxspeed_none",
+          "highway": "unclassified", "name": "Unclassified, Maxspeed None", "maxspeed": "none", "surface": "asphalt", "width": "6"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0550], [13.5025, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr05_width_effective",
+          "highway": "tertiary", "name": "Tertiary with Width:Effective", "width": "8", "width:effective": "6.5", "maxspeed": "50", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0555], [13.5025, 51.0555] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf04_bicycle_specific",
+          "highway": "residential", "name": "Road with Surface:bicycle", "surface": "concrete", "surface:bicycle": "asphalt", "width": "7", "maxspeed":"30"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0540], [13.5035, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "smoothness01_bicycle_specific",
+          "highway": "cycleway", "name": "Cycleway with Smoothness:bicycle", "surface": "asphalt", "smoothness": "bad", "smoothness:bicycle": "good", "width": "2.2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0545], [13.5035, 51.0545] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing02_marked_signals",
+          "highway": "cycleway", "cycleway": "crossing", "name": "Crossing with Signals", "crossing": "traffic_signals", "crossing:markings": "lines", "bicycle": "designated", "traffic_sign":"DE: Anlage 2 lfd. Nr. 74 StVO"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0595], [13.5001, 51.0595] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "parking_diagonal01",
+          "highway": "residential", "name": "Parking Diagonal", "width": "12", "maxspeed":"30",
+          "parking:left": "lane", "parking:left:orientation": "diagonal", "parking:left:width": "4.0", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0560], [13.5025, 51.0560] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "parking_perpendicular01",
+          "highway": "service", "service":"driveway", "name": "Parking Perpendicular", "width": "15", "maxspeed":"10",
+          "parking:right": "lane", "parking:right:orientation": "perpendicular", "bicycle":"yes", "surface":"concrete"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0565], [13.5025, 51.0565] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "lit_no01",
+          "highway": "cycleway", "name": "Unlit Cycleway", "lit": "no", "surface": "compacted", "width": "2.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0520], [13.5045, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "lit_sunset_sunrise01",
+          "highway": "path", "name": "Path Lit Sunset-Sunrise", "lit": "sunset-sunrise", "bicycle":"yes", "surface":"fine_gravel"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0525], [13.5045, 51.0525] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "motorway_link01",
+          "highway": "motorway_link", "name": "Motorway Link", "oneway":"yes", "maxspeed":"80"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0600], [13.5001, 51.0600] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "trunk01_bicycle_no",
+          "highway": "trunk", "name": "Trunk Road, Bicycle No", "bicycle": "no", "maxspeed":"100"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0605], [13.5001, 51.0605] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl07_cycleway_general_tag_offset",
+          "highway": "tertiary", "name": "Road with General Cycleway=track", "oneway": "no", "maxspeed": "30", "width": "8",
+          "cycleway": "track", "cycleway:width": "2.5", "cycleway:surface": "gravel", "cycleway:oneway": "no",
+          "comment": "Tests general cycleway tag for offsetting both sides."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0580], [13.5015, 51.0580] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "path03_bicycle_dismount",
+          "highway": "path", "name": "Path, Bicycle Dismount", "bicycle": "dismount", "foot": "yes",
+          "comment": "Should be excluded."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0610], [13.5001, 51.0610] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl08_complex_separation",
+          "highway": "secondary", "name": "Complex Separation Right", "width": "11", "maxspeed": "50",
+          "cycleway:right": "track", "cycleway:right:width": "2.0",
+          "cycleway:right:separation:left": "jersey_barrier", "cycleway:right:separation:right": "hedge",
+          "cycleway:right:buffer:left": "1.0", "cycleway:right:buffer:right": "0.2",
+          "cycleway:right:traffic_mode:left": "motor_vehicle", "cycleway:right:traffic_mode:right": "foot"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0590], [13.5015, 51.0590] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr06_oneway_motor_vehicle",
+          "highway": "residential", "name": "Oneway Motor, Two-way Cycle", "oneway": "yes", "oneway:motor_vehicle": "yes", "oneway:bicycle": "no",
+          "maxspeed": "30", "width": "5", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0570], [13.5025, 51.0570] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr07_maxspeed_variable",
+          "highway": "tertiary", "name": "Variable Maxspeed", "maxspeed": "50;30", "comment": "OSM error, test how getNumber handles this.",
+          "width": "7", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0575], [13.5025, 51.0575] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf05_track_grade1",
+          "highway": "track", "name": "Track Grade 1", "tracktype": "grade1", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0550], [13.5035, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf06_track_no_grade",
+          "highway": "track", "name": "Track No Grade", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0555], [13.5035, 51.0555] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx03_service_private_access",
+          "highway": "service", "name": "Private Service Road", "access": "private", "motor_vehicle": "private", "bicycle": "permissive",
+          "surface": "concrete", "width": "3.5", "lit": "yes", "maxspeed": "15"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0530], [13.5045, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx04_path_no_motor_access",
+          "highway": "path", "name": "Path No Motor Vehicle Access", "motor_vehicle": "no", "bicycle": "designated", "foot": "designated",
+          "surface": "fine_gravel", "smoothness": "good", "width": "2.8", "lit": "no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0535], [13.5045, 51.0535] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidepath_check02_explicit_no",
+          "highway": "path", "name": "Path Explicitly Not Sidepath", "is_sidepath": "no", "bicycle":"yes", "surface":"dirt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0522], [13.5055, 51.0522] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "mainroad_for_sidepath02_different_name",
+          "highway": "tertiary", "name": "Different Road Name", "maxspeed": "50", "width": "7"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0520], [13.5055, 51.0520] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing03_unmarked_high_speed_road",
+          "highway": "cycleway", "cycleway":"crossing", "name": "Unmarked Crossing High Speed", "crossing":"unmarked", "bicycle":"yes",
+          "comment": "This crossing is on a cycleway, but imagine it crosses a primary road (not explicitly modeled here, but influences stress)"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0615], [13.5001, 51.0615] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl09_cycleway_shared_lane",
+          "highway": "residential", "name": "Road with Shared Lane Markings", "maxspeed": "30", "width": "6", "surface":"asphalt",
+          "cycleway": "shared_lane"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0600], [13.5015, 51.0600] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl10_no_lit_parking_dooring",
+          "highway": "secondary", "name": "No Lit, Parking, Dooring Risk", "maxspeed": "50", "width": "9", "surface":"asphalt", "lit":"no",
+          "cycleway:right": "lane", "cycleway:right:width": "1.3",
+          "parking:right": "lane", "parking:right:orientation": "parallel", "parking:right:width": "2.0",
+          "cycleway:right:buffer:left": "0.2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0610], [13.5015, 51.0610] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr08_very_narrow_oneway",
+          "highway": "residential", "name": "Very Narrow Oneway", "width": "2.8", "oneway": "yes", "maxspeed": "20", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0580], [13.5025, 51.0580] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr09_no_maxspeed_tag",
+          "highway": "unclassified", "name": "Unclassified No Maxspeed Tag", "width": "5", "surface":"gravel"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0585], [13.5025, 51.0585] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf07_metal_surface",
+          "highway": "service", "service":"alley", "name": "Metal Surface Alley", "surface": "metal", "width": "3", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0560], [13.5035, 51.0560] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "smoothness02_horrible",
+          "highway": "track", "tracktype":"grade5", "name": "Horrible Track", "smoothness": "horrible", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0565], [13.5035, 51.0565] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx05_link_road",
+          "highway": "primary_link", "name": "Primary Link Road", "maxspeed": "60", "surface": "asphalt", "width": "4", "oneway":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0540], [13.5045, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx06_cycleway_link",
+          "highway": "cycleway", "cycleway":"link", "name": "Cycleway Link", "surface": "asphalt", "width": "2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0545], [13.5045, 51.0545] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "path04_informal_bicycle_yes",
+          "highway": "path", "name": "Informal Path, Bicycle Yes", "informal": "yes", "bicycle": "yes", "surface": "earth"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0620], [13.5001, 51.0620] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl11_oneway_road_cycleway_both_directions",
+          "highway": "tertiary", "name": "Oneway Road, Cycleway:both oneway:bicycle=no",
+          "oneway": "yes", "maxspeed": "30", "width": "7", "surface": "asphalt",
+          "cycleway:left": "track", "cycleway:left:width": "1.8", "cycleway:left:oneway": "no",
+          "cycleway:right": "track", "cycleway:right:width": "1.8", "cycleway:right:oneway": "yes",
+          "oneway:bicycle": "no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0620], [13.5015, 51.0620] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl12_no_explicit_cycleway_width",
+          "highway": "residential", "name": "Cycle Lane No Width Tag", "maxspeed": "30", "width": "7", "surface": "asphalt",
+          "cycleway:right": "lane"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0625], [13.5015, 51.0625] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr10_shared_lane_no_markings_tag",
+          "highway": "residential", "name": "Shared Lane, No Lane Markings Tag", "maxspeed": "30", "width": "5.5", "surface": "asphalt",
+          "lanes": "2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0590], [13.5025, 51.0590] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr11_lane_markings_no",
+          "highway": "unclassified", "name": "Lane Markings No", "maxspeed": "50", "width": "6", "surface": "asphalt",
+          "lane_markings": "no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0595], [13.5025, 51.0595] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf08_woodchips",
+          "highway": "path", "name": "Woodchips Path", "surface": "woodchips", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0570], [13.5035, 51.0570] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx07_bicycle_road_private",
+          "highway": "residential", "name": "Private Bicycle Road", "bicycle_road": "yes", "access": "private", "maxspeed": "20"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0550], [13.5045, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx08_track_service_high_quality",
+          "highway": "service", "name": "High Quality Service Road", "service": "driveway", "motor_vehicle": "destination",
+          "surface": "asphalt", "smoothness": "good", "width": "4", "maxspeed": "20", "lit": "yes", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0555], [13.5045, 51.0555] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidepath_check03_is_sidepath_yes_tag",
+          "highway": "cycleway", "name": "Explicit is_sidepath=yes", "is_sidepath": "yes", "surface": "concrete", "width": "1.8",
+          "is_sidepath:of": "primary"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0532], [13.5055, 51.0532] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "mainroad_for_sidepath03_primary",
+          "highway": "primary", "name": "Primary Road for explicit sidepath", "maxspeed": "60", "width": "10"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0530], [13.5055, 51.0530] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing04_traffic_signals_no_markings_tag",
+          "highway": "cycleway", "cycleway":"crossing", "name": "Crossing Signals, No Markings Tag", "crossing": "traffic_signals", "bicycle": "designated"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0625], [13.5001, 51.0625] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing05_zebra_marking",
+          "highway": "footway", "footway":"crossing", "name": "Zebra Crossing", "crossing": "marked", "crossing:markings": "zebra", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0630], [13.5001, 51.0630] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl13_cycleway_both_track_oneway_road",
+          "highway": "tertiary", "name": "Oneway Road, Cycleway:both=track",
+          "oneway": "yes", "maxspeed": "30", "width": "8", "surface": "asphalt",
+          "cycleway:both": "track", "cycleway:both:width": "2.0", "cycleway:both:surface": "compacted",
+          "oneway:bicycle": "no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0630], [13.5015, 51.0630] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl14_sidewalk_as_cycleway_offset",
+          "highway": "residential", "name": "Sidewalk used as Cycleway", "maxspeed": "30", "width": "7", "surface": "asphalt",
+          "sidewalk:left:bicycle": "designated", "sidewalk:left:width": "1.8", "sidewalk:left:surface": "asphalt",
+          "comment": "This should create an offset line classified as 'shared footway' or similar based on sidewalk tags"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0635], [13.5015, 51.0635] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr12_very_wide_residential_no_parking",
+          "highway": "residential", "name": "Very Wide Residential, No Parking", "width": "15", "maxspeed": "30", "surface": "asphalt",
+          "comment": "Test proc_width adjustment for shared roads if no parking is tagged."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0600], [13.5025, 51.0600] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr13_oneway_narrow_no_parking",
+          "highway": "residential", "name": "Oneway Narrow Residential, No Parking", "width": "4.5", "oneway": "yes", "maxspeed": "30", "surface": "asphalt",
+          "comment": "Test proc_width adjustment for oneway shared roads."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0605], [13.5025, 51.0605] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf09_surface_bicycle_concrete_plates",
+          "highway": "path", "name": "Path with surface:bicycle concrete:plates", "surface": "gravel", "surface:bicycle": "concrete:plates", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0575], [13.5035, 51.0575] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx09_living_street_explicit_maxspeed",
+          "highway": "living_street", "name": "Living Street with Maxspeed 20", "maxspeed": "20", "surface": "paving_stones"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0560], [13.5045, 51.0560] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx10_road_no_tags",
+          "highway": "road", "name": "Generic Road, No other tags"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0565], [13.5045, 51.0565] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "path05_segregated_no_explicit_foot_bicycle",
+          "highway": "path", "name": "Segregated Path, No Explicit Foot/Bicycle", "segregated": "yes", "surface": "asphalt", "width": "3.5",
+          "comment": "Assumes bicycle and foot are allowed unless denied."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0635], [13.5001, 51.0635] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl15_cycleway_right_only_oneway_road",
+          "highway": "residential", "name": "Oneway Road, Cycleway Right Only", "oneway":"yes", "maxspeed":"30", "width":"5",
+          "cycleway:right":"lane", "cycleway:right:width":"1.5", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0640], [13.5015, 51.0640] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl16_cycleway_left_only_oneway_road_contraflow_implicit",
+          "highway": "residential", "name": "Oneway Road, Cycleway Left (Contraflow)", "oneway":"yes", "maxspeed":"30", "width":"5",
+          "cycleway:left":"lane", "cycleway:left:width":"1.5", "surface":"asphalt",
+          "comment": "If oneway:bicycle=no is not present, this left lane is technically against oneway flow unless implied by tagging scheme"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0645], [13.5015, 51.0645] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr14_service_alley_narrow",
+          "highway": "service", "service":"alley", "name": "Narrow Alley", "width":"2.5", "surface":"cobblestone", "maxspeed":"10", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0610], [13.5025, 51.0610] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr15_tertiary_link_no_maxspeed",
+          "highway": "tertiary_link", "name": "Tertiary Link No Maxspeed", "width":"3.5", "surface":"asphalt", "oneway":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0615], [13.5025, 51.0615] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf10_smoothness_only",
+          "highway": "path", "name": "Path Smoothness Only", "smoothness":"intermediate", "bicycle":"yes", "width":"1.8"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0580], [13.5035, 51.0580] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx11_unclassified_rural_feel",
+          "highway": "unclassified", "name": "Rural Unclassified", "surface":"gravel", "width":"4", "maxspeed":"60", "lit":"no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0570], [13.5045, 51.0570] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx12_pedestrian_no_bicycle_tag",
+          "highway": "pedestrian", "name": "Pedestrian Area No Bicycle Tag", "surface":"paving_stones",
+          "comment": "Behavior depends on default bicycle access for pedestrian areas"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0575], [13.5045, 51.0575] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidepath_check04_short_segment",
+          "highway": "footway", "name": "Short Potential Sidepath", "width": "1.2", "surface": "asphalt", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0542], [13.5051, 51.0542] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "mainroad_for_sidepath04_closeby",
+          "highway": "residential", "name": "Road for Short Sidepath", "maxspeed": "30", "width": "6"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0540], [13.5051, 51.0540] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing06_no_tags_on_cycleway",
+          "highway": "cycleway", "name": "Cycleway Crossing No Tags", "cycleway":"crossing", "bicycle":"designated"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0640], [13.5001, 51.0640] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl17_cycleway_buffer_both_sides",
+          "highway": "primary", "name": "Cycleway with Buffer Both Sides", "maxspeed":"50", "width":"12", "surface":"asphalt",
+          "cycleway:left":"lane", "cycleway:left:width":"1.5", "cycleway:left:buffer:right":"0.75",
+          "cycleway:right":"lane", "cycleway:right:width":"1.5", "cycleway:right:buffer:left":"0.75"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0650], [13.5015, 51.0650] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl18_cycleway_separation_traffic_mode",
+          "highway": "secondary", "name": "Cycleway Separation & Traffic Mode", "maxspeed":"50", "width":"10", "surface":"asphalt",
+          "cycleway:left":"track", "cycleway:left:width":"2.0",
+          "cycleway:left:separation:right":"greenery",
+          "cycleway:left:traffic_mode:right":"motor_vehicle",
+          "cycleway:left:separation:left":"none",
+          "cycleway:left:traffic_mode:left":"foot"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0655], [13.5015, 51.0655] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr16_shared_road_very_low_speed",
+          "highway": "living_street", "name": "Shared Road Very Low Speed", "maxspeed":"5", "surface":"paving_stones", "width":"5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0620], [13.5025, 51.0620] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr17_motor_vehicle_no_bicycle_yes",
+          "highway": "service", "name": "Service Road MV No, Bicycle Yes", "motor_vehicle":"no", "bicycle":"yes", "surface":"compacted", "width":"3"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0625], [13.5025, 51.0625] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf11_unpaved_good_smoothness",
+          "highway": "track", "tracktype":"grade2", "name": "Unpaved Good Smoothness", "surface":"unpaved", "smoothness":"good", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0585], [13.5035, 51.0585] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx13_path_lit_narrow_good_surface",
+          "highway": "path", "name": "Path Lit Narrow Good Surface", "lit":"yes", "width":"1.2", "surface":"asphalt", "smoothness":"good", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0580], [13.5045, 51.0580] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx14_cycleway_on_bridge",
+          "highway": "cycleway", "name": "Cycleway on Bridge", "bridge":"yes", "layer":"1", "surface":"concrete", "width":"2.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0585], [13.5045, 51.0585] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sidepath_check05_parallel_no_name_match",
+          "highway": "path", "name": "Path Parallel No Name Match", "surface": "gravel", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0552], [13.5055, 51.0552] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "mainroad_for_sidepath05_tertiary",
+          "highway": "tertiary", "name": "Tertiary Road Nearby", "maxspeed": "50", "width": "6.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5050, 51.0550], [13.5055, 51.0550] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "crossing07_island_crossing",
+          "highway": "footway", "footway":"crossing", "name": "Crossing with Island", "crossing":"island", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5000, 51.0645], [13.5001, 51.0645] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl19_cycleway_both_advisory_oneway_road",
+          "highway": "residential", "name": "Oneway Road, Cycleway:both=lane (advisory)",
+          "oneway": "yes", "maxspeed": "30", "width": "6", "surface": "asphalt",
+          "cycleway:both": "lane", "cycleway:both:lane": "advisory", "cycleway:both:width": "1.2",
+          "oneway:bicycle":"no"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0660], [13.5015, 51.0660] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl20_cycleway_left_track_right_none_twoway_road",
+          "highway": "secondary", "name": "Two-way Road, Cycle Track Left, Nothing Right",
+          "oneway": "no", "maxspeed": "50", "width": "9", "surface": "asphalt",
+          "cycleway:left": "track", "cycleway:left:width": "2.1", "cycleway:left:surface": "concrete"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0665], [13.5015, 51.0665] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr18_road_with_maxspeed_country_DE",
+          "highway": "unclassified", "name": "Road Maxspeed DE:rural", "maxspeed": "DE:rural", "surface": "asphalt", "width": "5.5",
+          "comment": "Test non-numeric maxspeed handling if not already covered."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0630], [13.5025, 51.0630] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr19_road_width_with_unit",
+          "highway": "residential", "name": "Road Width with Unit", "width": "6.5 m", "maxspeed": "30", "surface": "asphalt",
+          "comment": "Test if 'm' in width is handled by getNumber."
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0635], [13.5025, 51.0635] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf12_multiple_semicolon_surface",
+          "highway": "path", "name": "Path Multiple Semicolon Surface", "surface": "asphalt;gravel;sand;mud", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0590], [13.5035, 51.0590] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx15_service_forestry_track",
+          "highway": "track", "name": "Forestry Service Track", "motor_vehicle": "forestry", "tracktype":"grade4", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0590], [13.5045, 51.0590] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx16_cycleway_in_tunnel",
+          "highway": "cycleway", "name": "Cycleway in Tunnel", "tunnel":"yes", "layer":"-1", "lit":"yes", "surface":"concrete", "width":"3"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0595], [13.5045, 51.0595] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl21_sidewalk_explicit_no_bicycle",
+          "highway": "residential", "name": "Road with Sidewalk, Bicycle Explicitly No on Sidewalk", "maxspeed": "30", "width": "8", "surface": "asphalt",
+          "sidewalk:both:bicycle": "no", "sidewalk:both:surface": "concrete", "sidewalk:both:width": "1.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0670], [13.5015, 51.0670] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl22_cycleway_lane_no_side_oneway_road",
+          "highway": "tertiary", "name": "Cycleway Lane (no side) on Oneway Road", "oneway":"yes", "maxspeed":"30", "width":"6", "surface":"asphalt",
+          "cycleway":"lane", "cycleway:width":"1.4"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0675], [13.5015, 51.0675] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr20_minimal_tags_residential",
+          "highway": "residential", "name": "Minimal Tags Residential"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0640], [13.5025, 51.0640] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr21_minimal_tags_path_bicycle_yes",
+          "highway": "path", "name": "Minimal Tags Path Bicycle Yes", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0645], [13.5025, 51.0645] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf13_empty_surface_tag",
+          "highway": "cycleway", "name": "Cycleway Empty Surface Tag", "surface": "", "width":"2", "smoothness":"good"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0595], [13.5035, 51.0595] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx17_steps_with_ramp",
+          "highway": "steps", "name": "Steps with Bicycle Ramp", "bicycle": "yes", "ramp:bicycle": "yes", "step_count":"10"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0600], [13.5045, 51.0600] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx18_very_long_name_and_id_test_for_field_length_handling_if_any_limits_exist_abcdefghijklmnopqrstuvwxyz0123456789_abcdefghijklmnopqrstuvwxyz0123456789_abcdefghijklmnopqrstuvwxyz0123456789",
+          "highway": "cycleway",
+          "name": "This is an extremely long name for a cycleway to test if there are any field length limitations in the processing or output, which sometimes can be an issue with certain data formats or database schemas, though GeoJSON itself is quite flexible in this regard, but intermediate processing steps might not be.",
+          "surface":"asphalt", "width":"2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0605], [13.5045, 51.0605] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl23_parking_left_cycleway_right",
+          "highway": "residential", "name": "Parking Left, Cycleway Right", "maxspeed":"30", "width":"10", "surface":"asphalt",
+          "parking:left":"lane", "parking:left:orientation":"parallel", "parking:left:width":"2.0",
+          "cycleway:right":"lane", "cycleway:right:width":"1.5", "cycleway:right:buffer:left":"0.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0680], [13.5015, 51.0680] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "cl24_no_width_on_cycleway_offset",
+          "highway": "secondary", "name": "Cycleway Track No Width (Offset)", "maxspeed":"50", "width":"9", "surface":"asphalt",
+          "cycleway:left":"track", "cycleway:left:surface":"compacted"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5010, 51.0685], [13.5015, 51.0685] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr22_road_oneway_minus_one",
+          "highway": "residential", "name": "Road Oneway -1", "oneway":"-1", "maxspeed":"30", "width":"5", "surface":"asphalt"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0650], [13.5025, 51.0650] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "sr23_road_alternating_oneway",
+          "highway": "service", "service":"driveway", "name": "Road Alternating Oneway", "oneway":"alternating", "maxspeed":"10", "width":"3", "surface":"concrete", "bicycle":"yes"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5020, 51.0655], [13.5025, 51.0655] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "surf14_cycleway_no_surface_no_smoothness",
+          "highway": "cycleway", "name": "Cycleway No Surface/Smoothness", "width":"2.2"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5030, 51.0600], [13.5035, 51.0600] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx19_footway_designated_bicycle_designated",
+          "highway": "footway", "name": "Footway Designated, Bicycle Designated", "foot":"designated", "bicycle":"designated", "surface":"asphalt", "width":"3"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0610], [13.5045, 51.0610] ] }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "id": "idx20_path_vehicle_no",
+          "highway": "path", "name": "Path Vehicle No", "vehicle":"no", "bicycle":"yes", "foot":"yes", "surface":"ground", "width":"1.5"
+        },
+        "geometry": { "type": "LineString", "coordinates": [ [13.5040, 51.0615], [13.5045, 51.0615] ] }
+      }
+    ]
+  }
+  
